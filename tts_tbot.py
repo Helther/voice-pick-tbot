@@ -12,8 +12,6 @@ def initialize() -> None:
     bot_utils.load_config(os.path.join(SCRIPT_PATH, "config"))
 
 
-
-
 def run_application() -> None:
     application = Application.builder().token(bot_utils.TOKEN).build()
 
