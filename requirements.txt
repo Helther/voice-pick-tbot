@@ -1,0 +1,5 @@
+python-telegram-bot==20.1
+--extra-index-url https://download.pytorch.org/whl/cu117
+torch 
+torchvision 
+torchaudio

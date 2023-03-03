@@ -1,0 +1,6 @@
+tortoise-tts-fast
+outputs
+.vscode
+__pycache__
+config
+models

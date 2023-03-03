@@ -1,0 +1,5 @@
+[Main]
+# token string for telegram api
+TOKEN = YOUR_BOT_TOKEN
+# 64-bit int of exclusive user, comment out the line to make bot public
+USER_ID = YOUR_ID
