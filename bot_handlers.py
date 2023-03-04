@@ -33,7 +33,7 @@ async def gen_audio_cmd(update: Update, context: CallbackContext) -> None:
         voice = context.args[0]
         if not validate_text(text):
             await update.message.reply_text("Error: Invalid text detected",
-                                      reply_to_message_id=reply_id)
+                                            reply_to_message_id=reply_id)
             return
 
         await gen_audio_impl(text, user, update.message, tts_audio_from_text, voice)

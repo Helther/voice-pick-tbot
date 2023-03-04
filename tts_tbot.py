@@ -17,11 +17,11 @@ def initialize() -> None:
     if not os.path.exists(bot_utils.VOICES_PATH):
         makedirs(bot_utils.VOICES_PATH)
 
-    bot_utils.load_config(os.path.join(bot_utils.DATA_PATH, bot_utils.CONFIG_FILE_NAME))
+    bot_utils.config.load_config(os.path.join(bot_utils.DATA_PATH, bot_utils.CONFIG_FILE_NAME))
 
 
 def run_application() -> None:
-    application = Application.builder().token(bot_utils.TOKEN).build()
+    application = Application.builder().token(bot_utils.config.token).build()
     # TODO add conversation for voice addition
     application.add_handler(CommandHandler("start", start_cmd))
     application.add_handler(CommandHandler("gen", gen_audio_cmd))

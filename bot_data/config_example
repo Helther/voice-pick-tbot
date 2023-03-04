@@ -1,5 +1,15 @@
 [Main]
-# token string for telegram api
+# Token string for telegram api
 TOKEN = YOUR_BOT_TOKEN
 # 64-bit int id for specific user private usage, comment out the line to make the bot public
 USER_ID = YOUR_ID
+
+[Tortoise]
+# Keep cuda cache between generation request or not
+KEEP_CACHE = False
+# If True keeps model info in video memory and accelerates output, otherwise moves more data to RAM
+HIGH_VRAM = True
+# Manually set autoregressive_batch_size - more means faster generation times, but requires more VRAM. Comment out to enable auto-detected values based on GPU VRAM
+BATCH_SIZE = 1
+# Specify GPU device id, if you have more than one
+DEVICE = 0

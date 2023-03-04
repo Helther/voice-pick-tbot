@@ -5,18 +5,17 @@ from torch.cuda import empty_cache
 from torch import cat
 from typing import List, Tuple
 from tortoise.utils.text import split_and_recombine_text
-from bot_utils import MODELS_PATH
+from bot_utils import MODELS_PATH, VOICES_PATH, config
 
 
-# TODO add args to config file
 # init tts models
-tts = tortoise.api.TextToSpeech(models_dir=MODELS_PATH, kv_cache=True, high_vram=True, autoregressive_batch_size=None, device=0)
+tts = tortoise.api.TextToSpeech(models_dir=MODELS_PATH, high_vram=config.high_vram, autoregressive_batch_size=config.batch_size, device=config.device)
 
 
 def run_tts_on_text(filename: str, text: str, voice: str, candidates: int) -> List[Tuple]:
     """save result into file with filename, returns audio data and filename pairs"""
     result = []
-    voice_samples, conditioning_latents = audio.load_voice(voice)
+    voice_samples, conditioning_latents = audio.load_voice(voice, [VOICES_PATH])
     pcm_audio = tts.tts_with_preset(text, voice_samples=voice_samples, conditioning_latents=conditioning_latents, preset="ultra_fast", k=candidates)
     pcm_audio = pcm_audio if candidates > 1 else [pcm_audio]
     for candidate_ind, sample in enumerate(pcm_audio):
@@ -43,4 +42,5 @@ def tts_audio_from_text(filename_result: str, text: str, voice: str) -> None:
         torchaudio.save(filename_result, audio_combined, 24000)
 
     finally:
-        empty_cache()  # TODO add config option to keep cache
+        if config.keep_cache:
+            empty_cache()
