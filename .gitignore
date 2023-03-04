@@ -2,5 +2,7 @@ tortoise-tts-fast
 outputs
 .vscode
 __pycache__
-config
-models
+bot_data/models
+bot_data/outputs
+bot_data/user_voices
+bot_data/config

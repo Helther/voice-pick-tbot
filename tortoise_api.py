@@ -3,15 +3,10 @@ from tortoise.utils import audio
 import torchaudio
 from torch.cuda import empty_cache
 from torch import cat
-from os import path
-from tortoise.utils.text import split_and_recombine_text
 from typing import List, Tuple
+from tortoise.utils.text import split_and_recombine_text
+from bot_utils import MODELS_PATH
 
-
-RESULTS_DIR = "outputs"
-SCRIPT_PATH = path.dirname(path.realpath(__file__))
-RESULTS_PATH = path.join(SCRIPT_PATH, RESULTS_DIR)
-MODELS_PATH = path.join(SCRIPT_PATH, "models")
 
 # TODO add args to config file
 # init tts models

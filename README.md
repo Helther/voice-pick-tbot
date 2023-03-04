@@ -5,7 +5,7 @@ This bot provides the ability to synthesize voice samples using tts-tortoise API
  * python 3.10.6
  * pip or anaconda env with python 3.10.6
  * ffmpeg
-
+Tested on Linux only, writtem with cross-platform in mind, should work on Windows
 ### install
 ```
 git clone https://github.com/152334H/tortoise-tts-fast.git
@@ -14,8 +14,8 @@ python -m pip install -e ./tortoise-tts-fast
 ```
 
 ### Usage
-Create configuration file named "config" inside repository directory
-and set user parameters. Use this [example](config_example) as reference.
+Create configuration file named "config" inside bota_data directory
+and set user parameters. Use this [example](bot_data/config_example) as reference.
 
 Run tts_tbot.py script from the required environment
 
