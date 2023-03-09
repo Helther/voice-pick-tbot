@@ -1,7 +1,7 @@
 # Voice Synthesis Telegram Bot
 This bot provides the ability to synthesize voice samples using tts-tortoise API.
 ### Prerequisites
- * NVIDIA GPU
+ * NVIDIA GPU (between 4 and 8Gb of VRAM required for inference)
  * python 3.10.6
  * pip or anaconda env with python 3.10.6
  * ffmpeg

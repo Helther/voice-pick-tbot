@@ -15,7 +15,7 @@ tts = tortoise.api.TextToSpeech(models_dir=MODELS_PATH, high_vram=config.high_vr
 def run_tts_on_text(filename: str, text: str, voice: str, user_voices_dir: str, candidates: int) -> List[Tuple]:
     """save result into file with filename, returns audio data and filename pairs"""
     result = []
-    voice_samples, conditioning_latents = audio.load_voice(voice, [user_voices_dir])  # TODO load from user voice dir
+    voice_samples, conditioning_latents = audio.load_voice(voice, [user_voices_dir])
     pcm_audio = tts.tts_with_preset(text, voice_samples=voice_samples, conditioning_latents=conditioning_latents, preset="ultra_fast", k=candidates)
     pcm_audio = pcm_audio if candidates > 1 else [pcm_audio]
     for candidate_ind, sample in enumerate(pcm_audio):

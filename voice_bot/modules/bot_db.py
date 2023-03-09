@@ -8,12 +8,13 @@ DB_NAME = "bot.db"
 DB_PATH = os.path.join(DATA_PATH, DB_NAME)
 USERS_TABLE = "users"
 VOICES_TABLE = "voices"
+DEFAULT_DEFAULT_VOICE = "train_dotrice"
 CREATE_USERS_TABLE = f"""CREATE TABLE "{USERS_TABLE}" (
 "uid"	INTEGER NOT NULL,
 "emotion_type"	INTEGER DEFAULT 0,
 "sample_num"	INTEGER DEFAULT 1,
 "voice_fid" INTEGER DEFAULT NULL,
-"default_voice" Text DEFAULT "random",
+"default_voice" Text DEFAULT "{DEFAULT_DEFAULT_VOICE}",
 PRIMARY KEY("uid"),
 FOREIGN KEY("voice_fid") REFERENCES voices(id)
 )"""
@@ -93,7 +94,8 @@ class DBHandle(object):
                     user_voices_db = set([uid[0] for uid in res.fetchall()])
                     voice_dirs = set([i for i in os.listdir(user_voices_path) if os.path.isdir(os.path.join(user_voices_path, i))])
                     for v in user_voices_db - voice_dirs:
-                        self.conn.execute(f"DELETE FROM {VOICES_TABLE} WHERE name={v} AND user_fid={uid}")
+                        self.conn.execute(f"DELETE FROM {VOICES_TABLE} WHERE name='{v}' AND user_fid={uid}")
+                        self.conn.execute(f"UPDATE {USERS_TABLE} SET default_voice='{DEFAULT_DEFAULT_VOICE}',voice_fid=NULL WHERE uid={uid}")
                     for v in voice_dirs - user_voices_db:
                         self.conn.execute(f"""INSERT INTO {VOICES_TABLE} (user_fid,name,path)
                                             VALUES ({uid},'{v}','{os.path.join(user_voices_path, v)}')""")
@@ -149,6 +151,11 @@ class DBHandle(object):
     def get_user_samples_setting(self, user_id: int) -> int:
         res = self.cursor.execute(f"SELECT sample_num FROM {USERS_TABLE} WHERE uid={user_id}")
         return res.fetchone()[0]
+
+    def insert_user_voice(self, user_id: int, name: str, path: str) -> None:
+        with self.conn:
+            self.conn.execute(f"""INSERT INTO {VOICES_TABLE} (user_fid,name,path)
+                                VALUES ({user_id},'{name}','{path}')""")
 
 
 db_handle = DBHandle()

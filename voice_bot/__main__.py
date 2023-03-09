@@ -9,6 +9,7 @@ import os.path
 from os import makedirs
 from modules.bot_handlers import start_cmd, gen_audio_cmd, help_cmd, retry_button, QUERY_PATTERN_RETRY
 from modules.bot_settings_menu import get_settings_menu_handler
+from modules.bot_voice_addition_menu import get_add_voice_menu_handler
 import modules.bot_utils as utils
 
 
@@ -26,6 +27,7 @@ def initialize_bot_data() -> None:
 async def init_bot_settings() -> Bot:
     bot = Bot(utils.config.token)
     cmds = [("gen", "Synthesize audio from provided text"),
+            ("add_voice", "Add your custom voice"),
             ("settings", "Customize audio synthesis parameters"),
             ("help", "Get command usage help")]
     await bot.set_my_commands(commands=cmds, language_code="en")
@@ -44,11 +46,12 @@ def create_bot() -> Bot:
 def run_application() -> None:
 
     application = Application.builder().bot(create_bot()).build()
-    # TODO add conversation for voice addition
+
     application.add_handler(CommandHandler("start", start_cmd))
     application.add_handler(CommandHandler("gen", gen_audio_cmd))
     application.add_handler(CommandHandler("help", help_cmd))
     application.add_handler(get_settings_menu_handler())
+    application.add_handler(get_add_voice_menu_handler())
     application.add_handler(CallbackQueryHandler(retry_button, pattern=f"^{QUERY_PATTERN_RETRY}*"))
 
     application.run_polling()

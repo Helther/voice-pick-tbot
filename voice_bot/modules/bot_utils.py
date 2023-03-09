@@ -4,9 +4,11 @@ import sys
 import subprocess
 import os
 import configparser
+import unicodedata
 from functools import wraps
 from typing import Callable
 from tortoise.utils import audio
+import string
 
 
 MAX_CHARS_NUM = 300
@@ -82,6 +84,26 @@ def convert_to_voice(filename: str) -> str:
     return result_file
 
 
+def convert_to_wav(filename: str) -> str:
+    result_file = filename.replace('ogg', 'wav')
+    convert_to_voice_cmd = f"ffmpeg -i {filename} -acodec pcm_s16le {result_file}"
+    try:
+        subprocess.run(f"{convert_to_voice_cmd}", shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except BaseException as e:
+        try:
+            os.remove(result_file)
+        except BaseException:
+            pass
+        raise BaseException from e
+    finally:
+        try:
+            os.remove(filename)
+        except BaseException:
+            pass
+
+    return result_file
+
+
 def clear_dir(dir_name: str) -> None:
     for filename in os.listdir(dir_name):
         file_path = os.path.join(dir_name, filename)
@@ -111,4 +133,19 @@ def get_emot_string(emot: str) -> str:
 
 
 def get_user_voice_dir(user_id: int) -> str:
-    return os.path.join(VOICES_PATH, str(user_id))
+    return os.path.normpath(os.path.join(VOICES_PATH, str(user_id)))
+
+
+def sanitize_filename(filename: str) -> str:
+    char_limit = 255
+
+    # replace spaces
+    filename.replace(' ', '_')
+
+    # keep only valid ascii chars
+    cleaned_filename = unicodedata.normalize('NFKD', filename).encode('ASCII', 'ignore').decode()
+
+    # keep only whitelisted chars
+    whitelist = "-_.() %s%s" % (string.ascii_letters, string.digits)
+    cleaned_filename = ''.join(c for c in cleaned_filename if c in whitelist)
+    return cleaned_filename[:char_limit]
