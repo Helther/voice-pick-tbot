@@ -116,9 +116,13 @@ class DBHandle(object):
             self.conn.execute(f"UPDATE {USERS_TABLE} SET voice_fid={voice_id} WHERE uid={user_id}")
 
     def update_default_voice_setting(self, user_id: int, voice_name: str) -> None:
-        # update voice_fid for user in users
+        # update default_voice for user in users
         with self.conn:
             self.conn.execute(f"UPDATE {USERS_TABLE} SET default_voice='{voice_name}',voice_fid=NULL WHERE uid={user_id}")
+
+    def update_user_samples_setting(self, user_id: int, sample_num: int) -> None:
+        with self.conn:
+            self.conn.execute(f"UPDATE {USERS_TABLE} SET sample_num={sample_num} WHERE uid={user_id}")
 
     def get_user_voices(self, user_id: int) -> List[tuple]:
         # return list of (id, name) tuples for user
@@ -137,10 +141,14 @@ class DBHandle(object):
         else:
             return name
 
-    def get_user_emotion(self, user_id: int) -> int:
+    def get_user_emotion_setting(self, user_id: int) -> int:
         res = self.cursor.execute(f"SELECT emotion_type FROM {USERS_TABLE} WHERE uid={user_id}")
         type = res.fetchone()[0]
         return type
+
+    def get_user_samples_setting(self, user_id: int) -> int:
+        res = self.cursor.execute(f"SELECT sample_num FROM {USERS_TABLE} WHERE uid={user_id}")
+        return res.fetchone()[0]
 
 
 db_handle = DBHandle()

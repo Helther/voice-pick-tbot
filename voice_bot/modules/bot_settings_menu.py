@@ -17,23 +17,28 @@ class Emotions(Enum):
     Sad = 1
     Angry = 2
     Happy = 3
+    Scared = 4
 
 
 SETTINGS_MENU_TEXT = "Edit Settings:"
-VOICES_MENU_TEXT = "Edit Settings:\nSelect voice:"
-EMOT_MENU_TEXT = "Edit Settings:\nSelect emotion:"
+VOICES_MENU_TEXT = "Edit Settings:\nSelect Voice:"
+EMOT_MENU_TEXT = "Edit Settings:\nSelect Emotion:"
+SAMPLES_MENU_TEXT = "Edit Settings:\nSelect Number of Samples:"
+SAMPLES_MENU_COUNT_MAX = 5
 EMOTION_STRINGS = {
     Emotions.Neutral.name: Emotions.Neutral,
     Emotions.Sad.name: Emotions.Sad,
     Emotions.Angry.name: Emotions.Angry,
-    Emotions.Happy.name: Emotions.Happy
+    Emotions.Happy.name: Emotions.Happy,
+    Emotions.Scared.name: Emotions.Scared,
 }
 
 EMOTION_VALUES = {
     Emotions.Neutral.value: Emotions.Neutral,
     Emotions.Sad.value: Emotions.Sad,
     Emotions.Angry.value: Emotions.Angry,
-    Emotions.Happy.value: Emotions.Happy
+    Emotions.Happy.value: Emotions.Happy,
+    Emotions.Scared.value: Emotions.Scared
 }
 
 
@@ -41,8 +46,9 @@ class SettingsMenuStates(Enum):
     select_setting = 0
     select_voice = 1
     select_emotion = 2
-    close_menu = 3
-    back = 4
+    select_samples = 3
+    close_menu = 4
+    back = 5
 
 
 """-----------------------------------Menu constructors-----------------------------------"""
@@ -52,6 +58,7 @@ def build_settings_menu() -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton("Select Voice", callback_data=SettingsMenuStates.select_voice.name)],
         [InlineKeyboardButton("Select Emotion", callback_data=SettingsMenuStates.select_emotion.name)],
+        [InlineKeyboardButton("Select Number Of Samples", callback_data=SettingsMenuStates.select_samples.name)],
         [InlineKeyboardButton("Close", callback_data=SettingsMenuStates.close_menu.name)]
     ]
     return InlineKeyboardMarkup(buttons)
@@ -63,8 +70,15 @@ def build_emotion_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
+def build_samples_menu() -> InlineKeyboardMarkup:
+    buttons = [[InlineKeyboardButton(str(ind), callback_data=str(ind))] for ind in range(1, SAMPLES_MENU_COUNT_MAX + 1)]
+    buttons.append([InlineKeyboardButton("Back", callback_data=SettingsMenuStates.back.name)])
+    return InlineKeyboardMarkup(buttons)
+
+
 SETTINGS_MARKUP = build_settings_menu()
 EMOTIONS_MARKUP = build_emotion_menu()
+SAMPLES_MARKUP = build_samples_menu()
 
 
 def build_voices_list(user_id: int) -> InlineKeyboardMarkup:
@@ -103,7 +117,7 @@ async def report_setting_error(query: CallbackQuery, msg: str) -> None:
 
 
 def get_emotion_name(user_id: int) -> str:
-    return EMOTION_VALUES[db_handle.get_user_emotion(user_id)].name
+    return EMOTION_VALUES[db_handle.get_user_emotion_setting(user_id)].name
 
 
 @user_restricted
@@ -115,6 +129,7 @@ async def settings_main_cmd(update: Update, context: CallbackContext) -> int:
 
 
 async def choose_setting(update: Update, context: CallbackContext) -> int:
+    """Main settings menu"""
     query = update.callback_query
     await query.answer()
 
@@ -139,6 +154,17 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
             return ConversationHandler.END
 
         return SettingsMenuStates.select_voice
+
+    if query.data == SettingsMenuStates.select_samples.name:
+        try:
+            samples_num = db_handle.get_user_samples_setting(update.effective_user.id)
+            await query.edit_message_text(f"{SAMPLES_MENU_TEXT}\nCurrent: {samples_num}", reply_markup=SAMPLES_MARKUP)
+        except BaseException as e:
+            logger.error(msg="Exception while choose_setting: ", exc_info=e)
+            await report_setting_error(query, "Failed to fetch Number Of Samples setting")
+            return ConversationHandler.END
+
+        return SettingsMenuStates.select_samples
 
     if query.data == SettingsMenuStates.close_menu.name:
         await query.edit_message_reply_markup()
@@ -179,6 +205,21 @@ async def choose_emotion(update: Update, context: CallbackContext) -> int:
     return SettingsMenuStates.select_setting
 
 
+async def choose_samples(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    await query.answer()
+    if query.data != SettingsMenuStates.back.name:
+        try:
+            db_handle.update_user_samples_setting(update.effective_user.id, int(query.data))
+        except BaseException as e:
+            logger.error(msg="Exception while choose_samples: ", exc_info=e)
+            await report_setting_error(query, "Failed to set active Number Of Samples")
+            return ConversationHandler.END
+
+    await query.edit_message_text(SETTINGS_MENU_TEXT, reply_markup=SETTINGS_MARKUP)
+    return SettingsMenuStates.select_setting
+
+
 def get_settings_menu_handler() -> ConversationHandler:
     """create menu state machine"""
     return ConversationHandler(
@@ -187,6 +228,7 @@ def get_settings_menu_handler() -> ConversationHandler:
             SettingsMenuStates.select_setting: [CallbackQueryHandler(choose_setting)],
             SettingsMenuStates.select_voice: [CallbackQueryHandler(choose_voice)],
             SettingsMenuStates.select_emotion: [CallbackQueryHandler(choose_emotion)],
+            SettingsMenuStates.select_samples: [CallbackQueryHandler(choose_samples)]
         },
         fallbacks=[CallbackQueryHandler(destroy_setings_menu)]
     )

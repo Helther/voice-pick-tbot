@@ -7,8 +7,6 @@ from telegram import (
 )
 from telegram.ext import CallbackContext
 import time
-import traceback
-import sys
 import os
 from typing import Callable
 from modules.bot_utils import (
@@ -66,27 +64,29 @@ async def gen_audio_impl(text: str, user: User, message: Message, syntesize: Cal
     try:
         voice = db_handle.get_user_voice_setting(user.id)
         emot = get_emotion_name(user.id)
+        samples_num = db_handle.get_user_samples_setting(user.id)
         if emot == Emotions.Neutral.name:  # if Neutral then don't prepend emotion string
             emot = None
-        syntesize(filename_result, text, voice, get_user_voice_dir(user.id), emot)
+        syntesize(filename_result, text, voice, get_user_voice_dir(user.id), emot, samples_num)
     except BaseException as e:
         logger.error(f"Audio generation FAILED: called by {user.full_name} with query: {text}", exc_info=e)
         await message.reply_html("Server Internal Error", reply_to_message_id=message.message_id)
     else:
-        voice_file = convert_to_voice(filename_result)
-        try:
-            with open(voice_file, 'rb') as audio:
-                keyboard = [[InlineKeyboardButton("Regenerate", callback_data=QUERY_PATTERN_RETRY)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                if len(text) > MAX_CHARS_NUM:  # elide to prevent hitting max caption size
-                    text = f"{text[:MAX_CHARS_NUM]}..."
-                await message.reply_voice(voice=audio, caption=text, reply_to_message_id=message.message_id, reply_markup=reply_markup)
-        except BaseException as e:
-            logger.error(f"Audio generation FAILED SEND FILE: called by {user.full_name} with query: {text}", exc_info=e)
-            traceback.print_exc(file=sys.stdout)
-            await message.reply_html("Server Internal Error", reply_to_message_id=message.message_id)
-        else:
-            logger.info(f"Audio generation DONE: called by {user.full_name} with query: {text}")
+        for sample_ind in range(samples_num):
+            sample_file = filename_result.replace(".wav", f"_{sample_ind}.wav")
+            voice_file = convert_to_voice(sample_file)
+            try:
+                with open(voice_file, 'rb') as audio:
+                    keyboard = [[InlineKeyboardButton("Regenerate", callback_data=QUERY_PATTERN_RETRY)]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    if len(text) > MAX_CHARS_NUM:  # elide to prevent hitting max caption size
+                        text = f"{text[:MAX_CHARS_NUM]}..."
+                    await message.reply_voice(voice=audio, caption=text, reply_to_message_id=message.message_id, reply_markup=reply_markup)
+            except BaseException as e:
+                logger.error(f"Audio generation FAILED SEND FILE: called by {user.full_name}, for sample №{sample_ind} with query: {text}", exc_info=e)
+                await message.reply_html("Server Internal Error", reply_to_message_id=message.message_id)
+            else:
+                logger.info(f"Audio generation DONE: called by {user.full_name}, for sample №{sample_ind}, with query: {text}")
     finally:
         clear_dir(RESULTS_PATH)
 
