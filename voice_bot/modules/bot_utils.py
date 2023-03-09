@@ -11,8 +11,8 @@ from tortoise.utils import audio
 
 MAX_CHARS_NUM = 300
 CONFIG_FILE_NAME = "config"
-SCRIPT_PATH = os.path.dirname(os.path.realpath(__file__))
-DATA_PATH = os.path.join(SCRIPT_PATH, "bot_data")
+SCRIPT_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../")
+DATA_PATH = os.path.join(SCRIPT_PATH, "../bot_data")
 RESULTS_PATH = os.path.join(DATA_PATH, "outputs")
 MODELS_PATH = os.path.join(DATA_PATH, "models")
 VOICES_PATH = os.path.join(DATA_PATH, "user_voices")

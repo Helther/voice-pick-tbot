@@ -7,24 +7,24 @@ from telegram import Bot
 import asyncio
 import os.path
 from os import makedirs
-from bot_handlers import start_cmd, gen_audio_cmd, help_cmd, retry_button, QUERY_PATTERN_RETRY
-from bot_settings_menu import get_settings_menu_handler
-import bot_utils
+from modules.bot_handlers import start_cmd, gen_audio_cmd, help_cmd, retry_button, QUERY_PATTERN_RETRY
+from modules.bot_settings_menu import get_settings_menu_handler
+import modules.bot_utils as utils
 
 
 def initialize_bot_data() -> None:
-    if not os.path.exists(bot_utils.RESULTS_PATH):
-        makedirs(bot_utils.RESULTS_PATH)
-    if not os.path.exists(bot_utils.MODELS_PATH):
-        makedirs(bot_utils.MODELS_PATH)
-    if not os.path.exists(bot_utils.VOICES_PATH):
-        makedirs(bot_utils.VOICES_PATH)
+    if not os.path.exists(utils.RESULTS_PATH):
+        makedirs(utils.RESULTS_PATH)
+    if not os.path.exists(utils.MODELS_PATH):
+        makedirs(utils.MODELS_PATH)
+    if not os.path.exists(utils.VOICES_PATH):
+        makedirs(utils.VOICES_PATH)
 
-    bot_utils.config.load_config(os.path.join(bot_utils.DATA_PATH, bot_utils.CONFIG_FILE_NAME))
+    utils.config.load_config(os.path.join(utils.DATA_PATH, utils.CONFIG_FILE_NAME))
 
 
 async def init_bot_settings() -> Bot:
-    bot = Bot(bot_utils.config.token)
+    bot = Bot(utils.config.token)
     cmds = [("gen", "Synthesize audio from provided text"),
             ("settings", "Customize audio synthesis parameters"),
             ("help", "Get command usage help")]

@@ -1,11 +1,11 @@
 import sqlite3
-from os import path, rmdir, listdir
+import os
 from typing import List
-from bot_utils import DATA_PATH, VOICES_PATH
+from modules.bot_utils import DATA_PATH, VOICES_PATH
 
 
 DB_NAME = "bot.db"
-DB_PATH = path.join(DATA_PATH, DB_NAME)
+DB_PATH = os.path.join(DATA_PATH, DB_NAME)
 USERS_TABLE = "users"
 VOICES_TABLE = "voices"
 CREATE_USERS_TABLE = f"""CREATE TABLE "{USERS_TABLE}" (
@@ -36,7 +36,7 @@ Exception catching and handling is reserved for the user (every query can potent
 
 class DBHandle(object):
     def __init__(self) -> None:
-        load_existing_db = path.exists(DB_PATH)
+        load_existing_db = os.path.exists(DB_PATH)
         self.conn = sqlite3.connect(DB_PATH)
         self.cursor = self.conn.cursor()
 
@@ -71,7 +71,7 @@ class DBHandle(object):
         with self.conn:
             res = self.conn.execute(f"SELECT uid FROM {USERS_TABLE}")
             users_db = set([str(uid[0]) for uid in res.fetchall()])
-            users_dirs = [i for i in listdir(VOICES_PATH) if path.isdir(path.join(VOICES_PATH, i))]
+            users_dirs = [i for i in os.listdir(VOICES_PATH) if os.path.isdir(os.path.join(VOICES_PATH, i))]
             for dir in users_dirs:
                 if dir not in users_db:
                     try:
@@ -85,18 +85,18 @@ class DBHandle(object):
             for user_voices_dir in users_dirs:
                 try:
                     uid = int(user_voices_dir)
-                    user_voices_path = path.join(VOICES_PATH, user_voices_dir)
+                    user_voices_path = os.path.join(VOICES_PATH, user_voices_dir)
                 except BaseException:
-                    rmdir(user_voices_path)  # remove not uid named folders
+                    os.rmdir(user_voices_path)  # remove not uid named folders
                 else:
                     res = self.conn.execute(f"SELECT name FROM {VOICES_TABLE} WHERE user_fid={uid}")
                     user_voices_db = set([uid[0] for uid in res.fetchall()])
-                    voice_dirs = set([i for i in listdir(user_voices_path) if path.isdir(path.join(user_voices_path, i))])
+                    voice_dirs = set([i for i in os.listdir(user_voices_path) if os.path.isdir(os.path.join(user_voices_path, i))])
                     for v in user_voices_db - voice_dirs:
                         self.conn.execute(f"DELETE FROM {VOICES_TABLE} WHERE name={v} AND user_fid={uid}")
                     for v in voice_dirs - user_voices_db:
                         self.conn.execute(f"""INSERT INTO {VOICES_TABLE} (user_fid,name,path)
-                                            VALUES ({uid},'{v}','{path.join(user_voices_path, v)}')""")
+                                            VALUES ({uid},'{v}','{os.path.join(user_voices_path, v)}')""")
 
     def init_user(self, user_id: int) -> None:
         # check if user exists and create if not

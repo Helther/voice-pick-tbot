@@ -5,9 +5,9 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
-from bot_utils import user_restricted, config, logger
+from modules.bot_utils import user_restricted, config, logger
 from enum import Enum
-from bot_db import db_handle
+from modules.bot_db import db_handle
 import json
 from itertools import zip_longest
 
@@ -43,6 +43,9 @@ class SettingsMenuStates(Enum):
     select_emotion = 2
     close_menu = 3
     back = 4
+
+
+"""-----------------------------------Menu constructors-----------------------------------"""
 
 
 def build_settings_menu() -> InlineKeyboardMarkup:
@@ -107,6 +110,8 @@ def get_emotion_name(user_id: int) -> str:
 async def settings_main_cmd(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text(SETTINGS_MENU_TEXT, reply_markup=SETTINGS_MARKUP)
     return SettingsMenuStates.select_setting
+
+"""-----------------------------------Menu callbacks-----------------------------------"""
 
 
 async def choose_setting(update: Update, context: CallbackContext) -> int:
@@ -175,6 +180,7 @@ async def choose_emotion(update: Update, context: CallbackContext) -> int:
 
 
 def get_settings_menu_handler() -> ConversationHandler:
+    """create menu state machine"""
     return ConversationHandler(
         entry_points=[CommandHandler("settings", settings_main_cmd)],
         states={

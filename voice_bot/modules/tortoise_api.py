@@ -5,7 +5,7 @@ from torch.cuda import empty_cache
 from torch import cat
 from typing import List, Tuple
 from tortoise.utils.text import split_and_recombine_text
-from bot_utils import MODELS_PATH, config, get_emot_string
+from modules.bot_utils import MODELS_PATH, config, get_emot_string
 
 
 # init tts models
