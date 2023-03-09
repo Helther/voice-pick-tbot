@@ -6,3 +6,4 @@ bot_data/models
 bot_data/outputs
 bot_data/user_voices
 bot_data/config
+bot.db

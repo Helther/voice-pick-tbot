@@ -1,4 +1,10 @@
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, User, Message
+from telegram import (
+    Update,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    User,
+    Message
+)
 from telegram.ext import CallbackContext
 import time
 import traceback
@@ -6,15 +12,20 @@ import sys
 from os import path
 from typing import Callable
 import bot_utils
-from bot_utils import validate_text, convert_to_voice, clear_results_dir, user_restricted, MAX_CHARS_NUM, RESULTS_PATH
+from bot_utils import validate_text, convert_to_voice, clear_dir, user_restricted, log_cmd, get_user_voice_dir, MAX_CHARS_NUM, RESULTS_PATH
 from tortoise_api import tts_audio_from_text
+from bot_db import db_handle
+from bot_settings_menu import get_emotion_name, Emotions
+
+
+QUERY_PATTERN_RETRY = "c_re"
 
 
 @user_restricted
 async def start_cmd(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     user = update.effective_user
-    bot_utils.logger.debug(f"started by user: {user.full_name} with id: {user.id}")
+    db_handle.init_user(user.id)
     await update.message.reply_html(f"Hi, {user.mention_html()}!")
 
 
@@ -25,47 +36,50 @@ async def gen_audio_cmd(update: Update, context: CallbackContext) -> None:
     bot_utils.logger.info(f"Audio generation called by {user.full_name}, with id: {user.id}, with query: {update.message.text}")
     reply_id = update.message.message_id
     if not context.args:
-        await update.message.reply_text("Error: invalid arguments provided)", reply_to_message_id=reply_id)
+        await update.message.reply_text("Error: invalid arguments provided", reply_to_message_id=reply_id)
         return
 
     try:
-        text = ' '.join(context.args[1:])
-        voice = context.args[0]
+        text = ' '.join(context.args)
         if not validate_text(text):
             await update.message.reply_text("Error: Invalid text detected",
                                             reply_to_message_id=reply_id)
             return
 
-        await gen_audio_impl(text, user, update.message, tts_audio_from_text, voice)
+        await gen_audio_impl(text, user, update.message, tts_audio_from_text)
     except BaseException as e:
         bot_utils.logger.error(msg="Exception while gen audio:", exc_info=e)
         await update.message.reply_html("Server Internal Error", reply_to_message_id=reply_id)
 
 
-async def gen_audio_impl(text: str, user: User, message: Message, syntesize: Callable, speaker_id: str = "freeman") -> None:
+async def gen_audio_impl(text: str, user: User, message: Message, syntesize: Callable) -> None:
     filename_result = path.abspath(path.join(RESULTS_PATH, '{}_{}.wav'.format(user.id, int(time.time()))))
     try:
-        syntesize(filename_result, text, speaker_id)
-    except BaseException:
-        bot_utils.logger.info(f"Audio generation FAILED: called by {user.full_name} with query: {text}")
-        traceback.print_exc(file=sys.stdout)
+        voice = db_handle.get_user_voice_setting(user.id)
+        emot = get_emotion_name(user.id)
+        if emot == Emotions.Neutral.name:  # if Neutral then don't prepend emotion string
+            emot = None
+        syntesize(filename_result, text, voice, get_user_voice_dir(user.id), emot)
+    except BaseException as e:
+        bot_utils.logger.error(f"Audio generation FAILED: called by {user.full_name} with query: {text}", exc_info=e)
+        await message.reply_html("Server Internal Error", reply_to_message_id=message.message_id)
     else:
         voice_file = convert_to_voice(filename_result)
         try:
             with open(voice_file, 'rb') as audio:
-                keyboard = [[InlineKeyboardButton("Regenerate", callback_data=speaker_id)]]
+                keyboard = [[InlineKeyboardButton("Regenerate", callback_data=QUERY_PATTERN_RETRY)]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                if len(text) > MAX_CHARS_NUM:
+                if len(text) > MAX_CHARS_NUM:  # elide to prevent hitting max caption size
                     text = f"{text[:MAX_CHARS_NUM]}..."
                 await message.reply_voice(voice=audio, caption=text, reply_to_message_id=message.message_id, reply_markup=reply_markup)
-        except BaseException:
-            bot_utils.logger.info(f"Audio generation FAILED SEND FILE: called by {user.full_name} with query: {text}")
+        except BaseException as e:
+            bot_utils.logger.error(f"Audio generation FAILED SEND FILE: called by {user.full_name} with query: {text}", exc_info=e)
             traceback.print_exc(file=sys.stdout)
             await message.reply_html("Server Internal Error", reply_to_message_id=message.message_id)
         else:
             bot_utils.logger.info(f"Audio generation DONE: called by {user.full_name} with query: {text}")
     finally:
-        clear_results_dir(RESULTS_PATH)
+        clear_dir(RESULTS_PATH)
 
 
 @user_restricted
@@ -74,11 +88,16 @@ async def retry_button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     user = update.effective_user
     await query.answer()
+
     bot_utils.logger.info(f"Retry called by {user.full_name}, with id: {user.id}, with query: {query.message.caption}")
-    await gen_audio_impl(query.message.caption, user, query.message, tts_audio_from_text, query.data)
+    try:
+        # TODO get actual message text instead of caption
+        await gen_audio_impl(query.message.caption, user, query.message, tts_audio_from_text)
+    except BaseException as e:
+        bot_utils.logger.error("Retry query FAILED", exc_info=e)
 
 
 async def help_cmd(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
-    bot_utils.logger.debug(f"user: {user.full_name} with id: {user.id} asked for help")
+    log_cmd(user, "help_cmd")
     await update.message.reply_text("No help here, yet")  # TODO
