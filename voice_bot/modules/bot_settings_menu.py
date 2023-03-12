@@ -156,7 +156,7 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
         try:
             active_emot = get_emotion_name(update.effective_user.id)
             await query.edit_message_text(f"{EMOT_MENU_TEXT}\nCurrent: {active_emot}", reply_markup=EMOTIONS_MARKUP)
-        except BaseException as e:
+        except Exception as e:
             logger.error(msg="Exception while choose_setting: ", exc_info=e)
             await report_error(query, SETTINGS_MENU_TEXT, "Failed to fetch Emotion setting")
             return ConversationHandler.END
@@ -167,7 +167,7 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
         try:
             active_voice = db_handle.get_user_voice_setting(update.effective_user.id)
             await query.edit_message_text(f"{VOICES_MENU_TEXT}\nCurrent: {active_voice}\nDefault voices:\tUser voices:", reply_markup=build_voices_list(update.effective_user.id))
-        except BaseException as e:
+        except Exception as e:
             logger.error(msg="Exception while choose_setting: ", exc_info=e)
             await report_error(query, SETTINGS_MENU_TEXT, "Failed to fetch Voice setting")
             return ConversationHandler.END
@@ -178,7 +178,7 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
         try:
             samples_num = db_handle.get_user_samples_setting(update.effective_user.id)
             await query.edit_message_text(f"{SAMPLES_MENU_TEXT}\nCurrent: {samples_num}", reply_markup=SAMPLES_MARKUP)
-        except BaseException as e:
+        except Exception as e:
             logger.error(msg="Exception while choose_setting: ", exc_info=e)
             await report_error(query, SETTINGS_MENU_TEXT, "Failed to fetch Number Of Samples setting")
             return ConversationHandler.END
@@ -200,7 +200,7 @@ async def choose_voice(update: Update, context: CallbackContext) -> int:
                 db_handle.update_default_voice_setting(update.effective_user.id, data_json["data"])
             else:
                 db_handle.update_user_voice_setting(update.effective_user.id, int(data_json["data"]))
-        except BaseException as e:
+        except Exception as e:
             logger.error(msg="Exception while choose_voice: ", exc_info=e)
             await report_error(query, SETTINGS_MENU_TEXT, "Failed to set Voice setting")
             return ConversationHandler.END
@@ -215,7 +215,7 @@ async def choose_emotion(update: Update, context: CallbackContext) -> int:
     if query.data != SettingsMenuStates.back.name:
         try:
             db_handle.update_emot_setting(update.effective_user.id, EMOTION_STRINGS[query.data].value)
-        except BaseException as e:
+        except Exception as e:
             logger.error(msg="Exception while choose_voice: ", exc_info=e)
             await report_error(query, SETTINGS_MENU_TEXT, "Failed to set active Emotion")
             return ConversationHandler.END
@@ -230,7 +230,7 @@ async def choose_samples(update: Update, context: CallbackContext) -> int:
     if query.data != SettingsMenuStates.back.name:
         try:
             db_handle.update_user_samples_setting(update.effective_user.id, int(query.data))
-        except BaseException as e:
+        except Exception as e:
             logger.error(msg="Exception while choose_samples: ", exc_info=e)
             await report_error(query, SETTINGS_MENU_TEXT, "Failed to set active Number Of Samples")
             return ConversationHandler.END

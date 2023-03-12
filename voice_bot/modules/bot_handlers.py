@@ -5,7 +5,8 @@ from telegram import (
     User,
     Message
 )
-from telegram.ext import CallbackContext, Application
+from telegram.error import TelegramError
+from telegram.ext import CallbackContext, Application, ContextTypes
 import time
 import os
 from modules.bot_utils import (
@@ -64,17 +65,13 @@ async def gen_audio_cmd(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Error: invalid arguments provided", reply_to_message_id=reply_id)
         return
 
-    try:
-        text = ' '.join(context.args)
-        if not validate_text(text):
-            await update.message.reply_text("Error: Invalid text detected",
-                                            reply_to_message_id=reply_id)
-            return
+    text = ' '.join(context.args)
+    if not validate_text(text):
+        await update.message.reply_text("Error: Invalid text detected",
+                                        reply_to_message_id=reply_id)
+        return
 
-        context.application.create_task(start_gen_task(update, context, update.message, text), update=update)
-    except BaseException as e:
-        logger.error(msg="Exception while gen_audio_cmd:", exc_info=e)
-        await update.message.reply_text("Server Internal Error", reply_to_message_id=reply_id)
+    context.application.create_task(start_gen_task(update, context, text), update=update)
 
 
 @user_restricted
@@ -83,11 +80,8 @@ async def retry_button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     context.application.create_task(answer_query(query), update=update)
 
-    try:
-        # TODO get actual message text instead of caption
-        context.application.create_task(start_gen_task(update, context, query.message, query.message.caption), update=update)
-    except BaseException as e:
-        logger.error("Retry query FAILED", exc_info=e)
+    # TODO get actual message text instead of caption
+    context.application.create_task(start_gen_task(update, context, query.message.caption), update=update)
 
 
 async def help_cmd(update: Update, context: CallbackContext) -> None:
@@ -96,44 +90,54 @@ async def help_cmd(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text("No help here, yet")  # TODO
 
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error(msg="Exception while handling an update:", exc_info=context.error)
+    if update and update.effective_message and update.effective_user:
+        await update.effective_message.reply_html(f"Sorry {update.effective_user.mention_html()}, there has been a Server Internal Error", reply_to_message_id=update.effective_message.message_id)
+
+
 """ ------------------------------TTS related callbacks------------------------------ """
 
 
-async def start_gen_task(update: Update, context: CallbackContext, message: Message, text: str) -> None:
+async def start_gen_task(update: Update, context: CallbackContext, text: str) -> None:
     user = update.effective_user
     filename_result = os.path.abspath(os.path.join(RESULTS_PATH, '{}_{}.wav'.format(user.id, int(time.time()))))
     settings = get_user_settings(user.id)
-    future = asyncio.run_coroutine_threadsafe(run_gen_audio(update, message, context.application, filename_result, settings, text, get_user_voice_dir(user.id)), tts_work_thread.loop)
+    future = asyncio.run_coroutine_threadsafe(run_gen_audio(update, context.application, filename_result, settings, text, get_user_voice_dir(user.id)), tts_work_thread.loop)
     future.add_done_callback(eval_gen_task)
 
 
-async def run_gen_audio(update: Update, message: Message, app: Application, filename_result: str, settings: UserSettings, text: str, user_voices_dir: str) -> None:
+async def run_gen_audio(update: Update, app: Application, filename_result: str, settings: UserSettings, text: str, user_voices_dir: str) -> None:
     tts_audio_from_text(filename_result, text, settings.voice, user_voices_dir, settings.emotion, settings.samples_num)
-    return update, message, app, filename_result, text, settings.samples_num
+    return update, app, filename_result, text, settings.samples_num
 
 
 def eval_gen_task(future: Future) -> None:
-    update, message, app, filename_result, text, samples_num = future.result()
-    # TODO handle errors in event loop
-    app.create_task(post_eval_gen_task(update.effective_user, filename_result, text, samples_num, message), update=update)
-
-
-async def post_eval_gen_task(user: User, filename_result: str, text: str, samples_num: int, message: Message) -> None:
+    exc = None
     try:
+        update, app, filename_result, text, samples_num = future.result()
+    except Exception as e:
+        exc = e
+    app.create_task(post_eval_gen_task(update.effective_user, filename_result, text, samples_num, update.effective_message, exc), update=update)
+
+
+async def post_eval_gen_task(user: User, filename_result: str, text: str, samples_num: int, message: Message, exc) -> None:
+    try:
+        if exc:  # propagate error from Future
+            raise exc
         for sample_ind in range(samples_num):
             sample_file = filename_result.replace(".wav", f"_{sample_ind}.wav")
             voice_file = convert_to_voice(sample_file)
-            try:
-                with open(voice_file, 'rb') as audio:
-                    keyboard = [[InlineKeyboardButton("Regenerate", callback_data=QUERY_PATTERN_RETRY)]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-                    if len(text) > MAX_CHARS_NUM:  # elide to prevent hitting max caption size
-                        text = f"{text[:MAX_CHARS_NUM]}..."
-                    await message.reply_voice(voice=audio, caption=text, reply_to_message_id=message.message_id, reply_markup=reply_markup)
-            except BaseException as e:
-                logger.error(f"Audio generation FAILED SEND FILE: called by {user.full_name}, for sample №{sample_ind} with query: {text}", exc_info=e)
-                await message.reply_text("Server Internal Error", reply_to_message_id=message.message_id)
-            else:
-                logger.info(f"Audio generation DONE: called by {user.full_name}, for sample №{sample_ind}, with query: {text}")
-    finally:
+            with open(voice_file, 'rb') as audio:
+                keyboard = [[InlineKeyboardButton("Regenerate", callback_data=QUERY_PATTERN_RETRY)]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                if len(text) > MAX_CHARS_NUM:  # elide to prevent hitting max caption size
+                    text = f"{text[:MAX_CHARS_NUM]}..."
+                await message.reply_voice(voice=audio, caption=text, reply_to_message_id=message.message_id, reply_markup=reply_markup)
+
+            logger.info(f"Audio generation DONE: called by {user.full_name}, for sample №{sample_ind}, with query: {text}")
+    except Exception as e:
+        clear_dir(RESULTS_PATH)
+        raise TelegramError("Audio generation Error") from e
+    else:
         clear_dir(RESULTS_PATH)

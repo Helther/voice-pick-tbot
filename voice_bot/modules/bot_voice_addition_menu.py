@@ -105,7 +105,7 @@ async def get_audio_files(update: Update, context: CallbackContext) -> int:
         current_voice_files.append(file_name + filetype)
         context.user_data[AddVoiceUserData.file_names.name] = current_voice_files
 
-    except BaseException as e:
+    except Exception as e:
         logger.error(msg="Exception while get_audio_files in Add voice menu", exc_info=e)
         await update.message.reply_text("Internal Server Error: try again later please")
         return await destroy_add_voice_menu(update, context)
@@ -123,7 +123,7 @@ async def get_voice_name(update: Update, context: CallbackContext) -> int:
         context.user_data[AddVoiceUserData.voice_name.name] = name
         await update.message.reply_text(f"{VOICE_ADDITION_MENU_TEXT}\nVoice name: {name}\n{VOICE_ADDITION_GET_AUDIO_TEXT}",
                                         reply_markup=ADD_VOICE_MARKUP)
-    except BaseException as e:
+    except Exception as e:
         logger.error(msg="Exception while get_voice_name in Add voice menu", exc_info=e)
         await update.message.reply_text("Invalid voice name provided")
         return VoiceMenuStates.get_name.value  # second chance
@@ -163,7 +163,7 @@ add more please (current duration: {current_duration} seconds){added_files_str}"
         AddVoiceUserData.clear_user_data(context.user_data)
         return ConversationHandler.END
 
-    except BaseException as e:
+    except Exception as e:
         logger.error(msg="Exception while accept in Add voice menu", exc_info=e)
         await report_error(query, VOICE_ADDITION_MENU_TEXT, "Failed to create the new voice")
         return await destroy_add_voice_menu(update, context)
@@ -180,7 +180,7 @@ async def destroy_add_voice_menu(update: Update, context: CallbackContext) -> in
     # Cleanup user_data if exists (voice dir)
     try:
         shutil.rmtree(os.path.join(get_user_voice_dir(update.effective_user.id), context.user_data[AddVoiceUserData.voice_name.name]))
-    except BaseException:
+    except Exception:
         pass
     AddVoiceUserData.clear_user_data(context.user_data)
     if query:

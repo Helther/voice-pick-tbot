@@ -77,7 +77,7 @@ class DBHandle(object):
                 if dir not in users_db:
                     try:
                         uid = int(dir)
-                    except BaseException:
+                    except Exception:
                         pass
                     else:
                         self.conn.execute(f"INSERT INTO {USERS_TABLE} (uid) VALUES ({uid})")
@@ -87,7 +87,7 @@ class DBHandle(object):
                 try:
                     uid = int(user_voices_dir)
                     user_voices_path = os.path.join(VOICES_PATH, user_voices_dir)
-                except BaseException:
+                except Exception:
                     os.rmdir(user_voices_path)  # remove not uid named folders
                 else:
                     res = self.conn.execute(f"SELECT name FROM {VOICES_TABLE} WHERE user_fid={uid}")

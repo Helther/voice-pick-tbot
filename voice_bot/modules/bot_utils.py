@@ -76,7 +76,7 @@ def convert_to_voice(filename: str) -> str:
     convert_to_voice_cmd = f"ffmpeg -i {filename} -c:a libopus {result_file}"
     try:
         subprocess.run(f"{convert_to_voice_cmd}", shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except BaseException:
+    except Exception:
         traceback.print_exc(file=sys.stdout)
         os.remove(result_file)
         result_file = None
@@ -89,16 +89,16 @@ def convert_to_wav(filename: str) -> str:
     convert_to_voice_cmd = f"ffmpeg -i {filename} -acodec pcm_s16le {result_file}"
     try:
         subprocess.run(f"{convert_to_voice_cmd}", shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except BaseException as e:
+    except Exception as e:
         try:
             os.remove(result_file)
-        except BaseException:
+        except Exception:
             pass
-        raise BaseException from e
+        raise Exception from e
     finally:
         try:
             os.remove(filename)
-        except BaseException:
+        except Exception:
             pass
 
     return result_file
