@@ -23,7 +23,7 @@ VOICE_DURATION_MAX = 120
 VOICE_ADDITION_MENU_TEXT = "Voice Addition Menu:"
 VOICE_ADDITION_GET_NAME_TEXT = "Provide a name for your voice:"
 VOICE_ADDITION_GET_AUDIO_TEXT = f"Send one or several audio files of intelligible speech\
-    \nUse wav, mp3 or voice recording, provide between {VOICE_DURATION_MIN} seconds and {VOICE_DURATION_MAX} seconds of audio\nThen press Accept:"
+    \nUse wav, mp3 or voice recording, provide between {VOICE_DURATION_MIN}s and {VOICE_DURATION_MAX}s of audio\nThen press Accept:"
 
 
 class VoiceMenuStates(Enum):

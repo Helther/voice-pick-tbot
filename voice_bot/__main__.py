@@ -7,7 +7,7 @@ from telegram import Bot
 import asyncio
 import os.path
 from os import makedirs
-from modules.bot_handlers import start_cmd, gen_audio_cmd, help_cmd, retry_button, QUERY_PATTERN_RETRY
+from modules.bot_handlers import start_cmd, gen_audio_cmd, help_cmd, retry_button, QUERY_PATTERN_RETRY, tts_work_thread
 from modules.bot_settings_menu import get_settings_menu_handler
 from modules.bot_voice_addition_menu import get_add_voice_menu_handler
 import modules.bot_utils as utils
@@ -53,6 +53,8 @@ def run_application() -> None:
     application.add_handler(get_settings_menu_handler())
     application.add_handler(get_add_voice_menu_handler())
     application.add_handler(CallbackQueryHandler(retry_button, pattern=f"^{QUERY_PATTERN_RETRY}*"))
+
+    tts_work_thread.start()
 
     application.run_polling()
 

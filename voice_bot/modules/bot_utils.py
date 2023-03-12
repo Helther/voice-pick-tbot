@@ -68,7 +68,7 @@ def validate_text(text: str) -> bool:
 
 
 def log_cmd(user, name: str) -> None:
-    logger.debug(f"user: {user.full_name} with id: {user.id} called: {name}")
+    logger.info(f"user: {user.full_name} with id: {user.id} called: {name}")
 
 
 def convert_to_voice(filename: str) -> str:
@@ -149,3 +149,7 @@ def sanitize_filename(filename: str) -> str:
     whitelist = "-_.() %s%s" % (string.ascii_letters, string.digits)
     cleaned_filename = ''.join(c for c in cleaned_filename if c in whitelist)
     return cleaned_filename[:char_limit]
+
+
+async def answer_query(query) -> None:
+    await query.answer()

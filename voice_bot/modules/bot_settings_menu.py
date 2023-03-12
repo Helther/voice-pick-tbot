@@ -5,7 +5,7 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
-from modules.bot_utils import user_restricted, config, logger
+from modules.bot_utils import user_restricted, answer_query, config, logger
 from enum import Enum
 from modules.bot_db import db_handle
 import json
@@ -49,6 +49,13 @@ class SettingsMenuStates(Enum):
     select_samples = 3
     close_menu = 4
     back = 5
+
+
+class UserSettings(object):
+    def __init__(self, voice: str, emot: str, samples: int) -> None:
+        self.voice = voice
+        self.emotion = emot
+        self.samples_num = samples
 
 
 """-----------------------------------Menu constructors-----------------------------------"""
@@ -109,7 +116,7 @@ def build_voices_list(user_id: int) -> InlineKeyboardMarkup:
 
 async def destroy_setings_menu(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
-    await query.answer()
+    context.application.create_task(answer_query(query), update=update)
 
     await query.edit_message_reply_markup()
     return ConversationHandler.END
@@ -121,6 +128,15 @@ async def report_error(query: CallbackQuery, menu_name: str, err_msg: str) -> No
 
 def get_emotion_name(user_id: int) -> str:
     return EMOTION_VALUES[db_handle.get_user_emotion_setting(user_id)].name
+
+
+def get_user_settings(user_id: int) -> UserSettings:
+    voice = db_handle.get_user_voice_setting(user_id)
+    emot = get_emotion_name(user_id)
+    samples_num = db_handle.get_user_samples_setting(user_id)
+    if emot == Emotions.Neutral.name:  # if Neutral then don't prepend emotion string
+        emot = None
+    return UserSettings(voice, emot, samples_num)
 
 
 @user_restricted
