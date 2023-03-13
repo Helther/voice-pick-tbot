@@ -5,19 +5,13 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
-from modules.bot_utils import user_restricted, answer_query, config, logger
+from modules.bot_utils import user_restricted, answer_query, config, logger, QUERY_PATTERN_RETRY
+from modules.bot_handlers import retry_button
+from modules.bot_settings import EMOTION_STRINGS, get_emotion_name
 from enum import Enum
 from modules.bot_db import db_handle
 import json
 from itertools import zip_longest
-
-
-class Emotions(Enum):
-    Neutral = 0
-    Sad = 1
-    Angry = 2
-    Happy = 3
-    Scared = 4
 
 
 SETTINGS_MENU_TEXT = "Edit Settings:"
@@ -25,21 +19,7 @@ VOICES_MENU_TEXT = "Edit Settings:\nSelect Voice:"
 EMOT_MENU_TEXT = "Edit Settings:\nSelect Emotion:"
 SAMPLES_MENU_TEXT = "Edit Settings:\nSelect Number of Samples:"
 SAMPLES_MENU_COUNT_MAX = 5
-EMOTION_STRINGS = {
-    Emotions.Neutral.name: Emotions.Neutral,
-    Emotions.Sad.name: Emotions.Sad,
-    Emotions.Angry.name: Emotions.Angry,
-    Emotions.Happy.name: Emotions.Happy,
-    Emotions.Scared.name: Emotions.Scared,
-}
-
-EMOTION_VALUES = {
-    Emotions.Neutral.value: Emotions.Neutral,
-    Emotions.Sad.value: Emotions.Sad,
-    Emotions.Angry.value: Emotions.Angry,
-    Emotions.Happy.value: Emotions.Happy,
-    Emotions.Scared.value: Emotions.Scared
-}
+QUERY_PATTERN_SETTINGS = "c_set"
 
 
 class SettingsMenuStates(Enum):
@@ -51,35 +31,28 @@ class SettingsMenuStates(Enum):
     back = 5
 
 
-class UserSettings(object):
-    def __init__(self, voice: str, emot: str, samples: int) -> None:
-        self.voice = voice
-        self.emotion = emot
-        self.samples_num = samples
-
-
 """-----------------------------------Menu constructors-----------------------------------"""
 
 
 def build_settings_menu() -> InlineKeyboardMarkup:
     buttons = [
-        [InlineKeyboardButton("Select Voice", callback_data=SettingsMenuStates.select_voice.name)],
-        [InlineKeyboardButton("Select Emotion", callback_data=SettingsMenuStates.select_emotion.name)],
-        [InlineKeyboardButton("Select Number Of Samples", callback_data=SettingsMenuStates.select_samples.name)],
-        [InlineKeyboardButton("Close", callback_data=SettingsMenuStates.close_menu.name)]
+        [InlineKeyboardButton("Select Voice", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_voice.name)],
+        [InlineKeyboardButton("Select Emotion", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_emotion.name)],
+        [InlineKeyboardButton("Select Number Of Samples", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_samples.name)],
+        [InlineKeyboardButton("Close", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.close_menu.name)]
     ]
     return InlineKeyboardMarkup(buttons)
 
 
 def build_emotion_menu() -> InlineKeyboardMarkup:
-    buttons = [[InlineKeyboardButton(emot_str, callback_data=emot_str)] for emot_str in EMOTION_STRINGS.keys()]
-    buttons.append([InlineKeyboardButton("Back", callback_data=SettingsMenuStates.back.name)])
+    buttons = [[InlineKeyboardButton(emot_str, callback_data=QUERY_PATTERN_SETTINGS + emot_str)] for emot_str in EMOTION_STRINGS.keys()]
+    buttons.append([InlineKeyboardButton("Back", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.back.name)])
     return InlineKeyboardMarkup(buttons)
 
 
 def build_samples_menu() -> InlineKeyboardMarkup:
-    buttons = [[InlineKeyboardButton(str(ind), callback_data=str(ind))] for ind in range(1, SAMPLES_MENU_COUNT_MAX + 1)]
-    buttons.append([InlineKeyboardButton("Back", callback_data=SettingsMenuStates.back.name)])
+    buttons = [[InlineKeyboardButton(str(ind), callback_data=QUERY_PATTERN_SETTINGS + str(ind))] for ind in range(1, SAMPLES_MENU_COUNT_MAX + 1)]
+    buttons.append([InlineKeyboardButton("Back", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.back.name)])
     return InlineKeyboardMarkup(buttons)
 
 
@@ -97,10 +70,10 @@ def build_voices_list(user_id: int) -> InlineKeyboardMarkup:
     }
     """
     default_voices = config.default_voices
-    buttons_default_col = [InlineKeyboardButton(name, callback_data=json.dumps({"is_default": True, "data": name})) for name in default_voices]
+    buttons_default_col = [InlineKeyboardButton(name, callback_data=QUERY_PATTERN_SETTINGS + json.dumps({"is_default": True, "data": name})) for name in default_voices]
     user_voices = db_handle.get_user_voices(user_id)  # tuples of (id, name)
     if user_voices:
-        buttons_user_col = [InlineKeyboardButton(name, callback_data=json.dumps({"is_default": False, "data": id})) for id, name in user_voices]
+        buttons_user_col = [InlineKeyboardButton(name, callback_data=QUERY_PATTERN_SETTINGS + json.dumps({"is_default": False, "data": id})) for id, name in user_voices]
     else:
         buttons_user_col = []
     menu = []
@@ -110,7 +83,7 @@ def build_voices_list(user_id: int) -> InlineKeyboardMarkup:
             menu[len(menu) - 1].append(default)
         if user:
             menu[len(menu) - 1].append(user)
-    menu.append([InlineKeyboardButton("Back", callback_data=SettingsMenuStates.back.name)])
+    menu.append([InlineKeyboardButton("Back", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.back.name)])
     return InlineKeyboardMarkup(menu)
 
 
@@ -118,25 +91,12 @@ async def destroy_setings_menu(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     context.application.create_task(answer_query(query), update=update)
 
-    await query.edit_message_reply_markup()
+    await query.edit_message_text(SETTINGS_MENU_TEXT + "\nExited")
     return ConversationHandler.END
 
 
 async def report_error(query: CallbackQuery, menu_name: str, err_msg: str) -> None:
     await query.edit_message_text(f"{menu_name}\nError: {err_msg}", reply_markup=None)
-
-
-def get_emotion_name(user_id: int) -> str:
-    return EMOTION_VALUES[db_handle.get_user_emotion_setting(user_id)].name
-
-
-def get_user_settings(user_id: int) -> UserSettings:
-    voice = db_handle.get_user_voice_setting(user_id)
-    emot = get_emotion_name(user_id)
-    samples_num = db_handle.get_user_samples_setting(user_id)
-    if emot == Emotions.Neutral.name:  # if Neutral then don't prepend emotion string
-        emot = None
-    return UserSettings(voice, emot, samples_num)
 
 
 @user_restricted
@@ -151,8 +111,8 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
     """Main settings menu"""
     query = update.callback_query
     await query.answer()
-
-    if query.data == SettingsMenuStates.select_emotion.name:
+    data = query.data[len(QUERY_PATTERN_SETTINGS):]
+    if data == SettingsMenuStates.select_emotion.name:
         try:
             active_emot = get_emotion_name(update.effective_user.id)
             await query.edit_message_text(f"{EMOT_MENU_TEXT}\nCurrent: {active_emot}", reply_markup=EMOTIONS_MARKUP)
@@ -163,7 +123,7 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
 
         return SettingsMenuStates.select_emotion
 
-    if query.data == SettingsMenuStates.select_voice.name:
+    if data == SettingsMenuStates.select_voice.name:
         try:
             active_voice = db_handle.get_user_voice_setting(update.effective_user.id)
             await query.edit_message_text(f"{VOICES_MENU_TEXT}\nCurrent: {active_voice}\nDefault voices:\tUser voices:", reply_markup=build_voices_list(update.effective_user.id))
@@ -174,7 +134,7 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
 
         return SettingsMenuStates.select_voice
 
-    if query.data == SettingsMenuStates.select_samples.name:
+    if data == SettingsMenuStates.select_samples.name:
         try:
             samples_num = db_handle.get_user_samples_setting(update.effective_user.id)
             await query.edit_message_text(f"{SAMPLES_MENU_TEXT}\nCurrent: {samples_num}", reply_markup=SAMPLES_MARKUP)
@@ -185,7 +145,7 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
 
         return SettingsMenuStates.select_samples
 
-    if query.data == SettingsMenuStates.close_menu.name:
+    if data == SettingsMenuStates.close_menu.name:
         await query.edit_message_reply_markup()
         return ConversationHandler.END
 
@@ -193,9 +153,10 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
 async def choose_voice(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
-    if query.data != SettingsMenuStates.back.name:
+    data = query.data[len(QUERY_PATTERN_SETTINGS):]
+    if data != SettingsMenuStates.back.name:
         try:
-            data_json = json.loads(query.data)
+            data_json = json.loads(data)
             if data_json["is_default"]:
                 db_handle.update_default_voice_setting(update.effective_user.id, data_json["data"])
             else:
@@ -212,9 +173,10 @@ async def choose_voice(update: Update, context: CallbackContext) -> int:
 async def choose_emotion(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
-    if query.data != SettingsMenuStates.back.name:
+    data = query.data[len(QUERY_PATTERN_SETTINGS):]
+    if data != SettingsMenuStates.back.name:
         try:
-            db_handle.update_emot_setting(update.effective_user.id, EMOTION_STRINGS[query.data].value)
+            db_handle.update_emot_setting(update.effective_user.id, EMOTION_STRINGS[data].value)
         except Exception as e:
             logger.error(msg="Exception while choose_voice: ", exc_info=e)
             await report_error(query, SETTINGS_MENU_TEXT, "Failed to set active Emotion")
@@ -227,9 +189,10 @@ async def choose_emotion(update: Update, context: CallbackContext) -> int:
 async def choose_samples(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
-    if query.data != SettingsMenuStates.back.name:
+    data = query.data[len(QUERY_PATTERN_SETTINGS):]
+    if data != SettingsMenuStates.back.name:
         try:
-            db_handle.update_user_samples_setting(update.effective_user.id, int(query.data))
+            db_handle.update_user_samples_setting(update.effective_user.id, int(data))
         except Exception as e:
             logger.error(msg="Exception while choose_samples: ", exc_info=e)
             await report_error(query, SETTINGS_MENU_TEXT, "Failed to set active Number Of Samples")
@@ -239,18 +202,24 @@ async def choose_samples(update: Update, context: CallbackContext) -> int:
     return SettingsMenuStates.select_setting
 
 
+async def fallback(update: Update, context: CallbackContext) -> int:
+    await update.effective_message.reply_text("Unexpected action performed during settings editing, please try again later")
+    return ConversationHandler.END
+
+
 def get_settings_menu_handler() -> ConversationHandler:
-    """create menu state machine"""
+    """
+    create menu state machine
+    ignore non menu keyboard presses, unless it's retry, anything else is valid outside of the menu
+    """
     return ConversationHandler(
         entry_points=[CommandHandler("settings", settings_main_cmd)],
         states={
-            SettingsMenuStates.select_setting: [CallbackQueryHandler(choose_setting)],
-            SettingsMenuStates.select_voice: [CallbackQueryHandler(choose_voice)],
-            SettingsMenuStates.select_emotion: [CallbackQueryHandler(choose_emotion)],
-            SettingsMenuStates.select_samples: [CallbackQueryHandler(choose_samples)],
-            ConversationHandler.TIMEOUT: [CallbackQueryHandler(destroy_setings_menu)]
+            SettingsMenuStates.select_setting: [CallbackQueryHandler(choose_setting, pattern=f"^{QUERY_PATTERN_SETTINGS}*")],
+            SettingsMenuStates.select_voice: [CallbackQueryHandler(choose_voice, pattern=f"^{QUERY_PATTERN_SETTINGS}*")],
+            SettingsMenuStates.select_emotion: [CallbackQueryHandler(choose_emotion, pattern=f"^{QUERY_PATTERN_SETTINGS}*")],
+            SettingsMenuStates.select_samples: [CallbackQueryHandler(choose_samples, pattern=f"^{QUERY_PATTERN_SETTINGS}*")]
         },
-        fallbacks=[CallbackQueryHandler(destroy_setings_menu)],
-        allow_reentry=True,
-        conversation_timeout=60
+        fallbacks=[CallbackQueryHandler(retry_button, pattern=f"^{QUERY_PATTERN_RETRY}*"), CallbackQueryHandler(fallback)],
+        allow_reentry=True
     )

@@ -23,14 +23,12 @@ from modules.bot_utils import (
 )
 from modules.tortoise_api import tts_audio_from_text
 from modules.bot_db import db_handle
-from modules.bot_settings_menu import get_user_settings, UserSettings
+from modules.bot_settings import get_user_settings, UserSettings
+from modules.bot_utils import SOURCE_WEB_LINK, QUERY_PATTERN_RETRY
 import asyncio
 from concurrent.futures import Future
 from threading import Thread
-
-
-QUERY_PATTERN_RETRY = "c_re"
-SOURCE_WEB_LINK = "https://github.com/Helther/voice-pick-tbot"
+from asyncio.events import AbstractEventLoop
 
 
 class TTSWorkThread(Thread):
@@ -102,7 +100,7 @@ async def help_cmd(update: Update, context: CallbackContext) -> None:
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
     if update and update.effective_message and update.effective_user:
-        await update.effective_message.reply_html(f"Sorry {update.effective_user.mention_html()}, there has been a Server Internal Error", reply_to_message_id=update.effective_message.message_id)
+        await update.effective_message.reply_html(f"Sorry {update.effective_user.mention_html()}, there has been a Server Internal Error when processing your command, please try again", reply_to_message_id=update.effective_message.message_id)
 
 
 """ ------------------------------TTS related callbacks------------------------------ """
@@ -112,28 +110,43 @@ async def start_gen_task(update: Update, context: CallbackContext, text: str) ->
     user = update.effective_user
     filename_result = os.path.abspath(os.path.join(RESULTS_PATH, '{}_{}.wav'.format(user.id, int(time.time()))))
     settings = get_user_settings(user.id)
-    future = asyncio.run_coroutine_threadsafe(run_gen_audio(update, context.application, filename_result, settings, text, get_user_voice_dir(user.id)), tts_work_thread.loop)
+    loop = asyncio.get_running_loop()
+    future = asyncio.run_coroutine_threadsafe(run_gen_audio(update, context.application, filename_result, settings, text, get_user_voice_dir(user.id), loop), tts_work_thread.loop)
     future.add_done_callback(eval_gen_task)
 
 
-async def run_gen_audio(update: Update, app: Application, filename_result: str, settings: UserSettings, text: str, user_voices_dir: str) -> None:
-    tts_audio_from_text(filename_result, text, settings.voice, user_voices_dir, settings.emotion, settings.samples_num)
+async def run_gen_audio(update: Update, app: Application, filename_result: str, settings: UserSettings, text: str, user_voices_dir: str, app_loop: AbstractEventLoop) -> None:
+    """Running in tts_worker thread"""
+    try:
+        tts_audio_from_text(filename_result, text, settings.voice, user_voices_dir, settings.emotion, settings.samples_num)
+    except Exception as e:
+        async def handle_post_eval_gen_report_error(update: Update, app: Application, exc: Exception) -> None:
+            app.create_task(post_eval_gen_report_error(update, exc), update=update)
+
+        asyncio.run_coroutine_threadsafe(handle_post_eval_gen_report_error(update, app, e), app_loop)
+
     return update, app, filename_result, text, settings.samples_num
 
 
 def eval_gen_task(future: Future) -> None:
-    exc = None  # TODO fix, this doesn't actually handles exc, and reply never sent
     try:
         update, app, filename_result, text, samples_num = future.result()
     except Exception as e:
-        exc = e
-    app.create_task(post_eval_gen_task(update.effective_user, filename_result, text, samples_num, update.effective_message, exc), update=update)
+        logger.error(msg="Exception while handling eval_gen_task:", exc_info=e)
+    else:
+        app.create_task(post_eval_gen_task(update.effective_user, filename_result, text, samples_num, update.effective_message), update=update)
 
 
-async def post_eval_gen_task(user: User, filename_result: str, text: str, samples_num: int, message: Message, exc) -> None:
+async def post_eval_gen_report_error(update: Update, exc) -> None:
+    """handles errors from tts_worker thread"""
+    clear_dir(RESULTS_PATH)
+    logger.error(msg="Exception while handling run_gen_audio:", exc_info=exc)
+    if update and update.effective_message and update.effective_user:
+        await update.effective_message.reply_html(f"Sorry {update.effective_user.mention_html()}, your audio generation failed, please try again", reply_to_message_id=update.effective_message.message_id)
+
+
+async def post_eval_gen_task(user: User, filename_result: str, text: str, samples_num: int, message: Message) -> None:
     try:
-        if exc:  # propagate error from Future
-            raise exc
         for sample_ind in range(samples_num):
             sample_file = filename_result.replace(".wav", f"_{sample_ind}.wav")
             voice_file = convert_to_voice(sample_file)

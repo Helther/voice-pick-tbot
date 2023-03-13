@@ -18,6 +18,8 @@ DATA_PATH = os.path.join(SCRIPT_PATH, "../bot_data")
 RESULTS_PATH = os.path.join(DATA_PATH, "outputs")
 MODELS_PATH = os.path.join(DATA_PATH, "models")
 VOICES_PATH = os.path.join(DATA_PATH, "user_voices")
+QUERY_PATTERN_RETRY = "c_re"
+SOURCE_WEB_LINK = "https://github.com/Helther/voice-pick-tbot"
 
 
 # Enable logging

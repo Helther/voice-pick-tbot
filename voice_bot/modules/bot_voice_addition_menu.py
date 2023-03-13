@@ -167,6 +167,15 @@ add more please (current duration: {current_duration} seconds){added_files_str}"
         return await destroy_add_voice_menu(update, context)
 
 
+def cleanup_data(user_id: int, voice_dir: str, user_data) -> None:
+    # Cleanup user_data if exists (and voice dir),
+    try:
+        shutil.rmtree(os.path.join(get_user_voice_dir(user_id), voice_dir))
+    except Exception:
+        pass
+    AddVoiceUserData.clear_user_data(user_data)
+
+
 async def cancel(update: Update, context: CallbackContext) -> int:
     return await destroy_add_voice_menu(update, context)
 
@@ -175,19 +184,23 @@ async def destroy_add_voice_menu(update: Update, context: CallbackContext) -> in
     query = update.callback_query
     if query:
         await query.answer()
-    # Cleanup user_data if exists (voice dir)
-    try:
-        shutil.rmtree(os.path.join(get_user_voice_dir(update.effective_user.id), context.user_data[AddVoiceUserData.voice_name.name]))
-    except Exception:
-        pass
-    AddVoiceUserData.clear_user_data(context.user_data)
+    cleanup_data(update.effective_user.id, context.user_data.get(AddVoiceUserData.voice_name.name, None), context.user_data)
     if query:
-        await query.edit_message_text("Voice addition finished")
+        await query.edit_message_text("Voice addition exited")
+    return ConversationHandler.END
+
+
+async def fallback(update: Update, context: CallbackContext) -> int:
+    cleanup_data(update.effective_user.id, context.user_data.get(AddVoiceUserData.voice_name.name, None), context.user_data)
+    await update.effective_message.reply_text("Voice addition left unfinished, cancelling... please try again later")
     return ConversationHandler.END
 
 
 def get_add_voice_menu_handler() -> ConversationHandler:
-    """create menu state machine"""
+    """
+    create menu state machine
+    handle all non menu button presses and messages as cancellation
+    """
     return ConversationHandler(
         entry_points=[CommandHandler("add_voice", add_voice_main_cmd)],
         states={
@@ -195,9 +208,7 @@ def get_add_voice_menu_handler() -> ConversationHandler:
                                               CallbackQueryHandler(accept, pattern=VoiceMenuStates.accept.name),
                                               CallbackQueryHandler(cancel, pattern=VoiceMenuStates.cancel.name)],
             VoiceMenuStates.get_name.value: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_voice_name),
-                                             CallbackQueryHandler(cancel, pattern=VoiceMenuStates.cancel.name)],
-            ConversationHandler.TIMEOUT: [CallbackQueryHandler(destroy_add_voice_menu)]
+                                             CallbackQueryHandler(cancel, pattern=VoiceMenuStates.cancel.name)]
         },
-        fallbacks=[CallbackQueryHandler(destroy_add_voice_menu)],
-        conversation_timeout=300
+        fallbacks=[CallbackQueryHandler(fallback)]
     )
