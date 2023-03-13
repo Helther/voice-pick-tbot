@@ -89,8 +89,8 @@ async def help_cmd(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
     log_cmd(user, "help_cmd")
     help_msg = ("Bot usage: select from the menu or type commands to interact with the bot. List of commands:\n"
-                "<u>/gen</u> - provide text with this command and evenrually receive a voice reply with your query,"
-                ",it may takes some time, depending on text length (from couple of seconds for a short sentence to "
+                "<u>/gen</u> - provide text with this command and eventually receive a voice reply with your query,"
+                "it may takes some time, depending on text length (from couple of seconds for a short sentence to "
                 "couple of minutes for essays)\n"
                 "<u>/add_voice</u> - to start a guided process of adding user voice for cloning, by providing the name and audio samples "
                 "via files or voice recording\n"
@@ -122,7 +122,7 @@ async def run_gen_audio(update: Update, app: Application, filename_result: str, 
 
 
 def eval_gen_task(future: Future) -> None:
-    exc = None
+    exc = None  # TODO fix, this doesn't actually handles exc, and reply never sent
     try:
         update, app, filename_result, text, samples_num = future.result()
     except Exception as e:

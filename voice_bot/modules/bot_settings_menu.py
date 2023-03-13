@@ -247,7 +247,10 @@ def get_settings_menu_handler() -> ConversationHandler:
             SettingsMenuStates.select_setting: [CallbackQueryHandler(choose_setting)],
             SettingsMenuStates.select_voice: [CallbackQueryHandler(choose_voice)],
             SettingsMenuStates.select_emotion: [CallbackQueryHandler(choose_emotion)],
-            SettingsMenuStates.select_samples: [CallbackQueryHandler(choose_samples)]
+            SettingsMenuStates.select_samples: [CallbackQueryHandler(choose_samples)],
+            ConversationHandler.TIMEOUT: [CallbackQueryHandler(destroy_setings_menu)]
         },
-        fallbacks=[CallbackQueryHandler(destroy_setings_menu)]
+        fallbacks=[CallbackQueryHandler(destroy_setings_menu)],
+        allow_reentry=True,
+        conversation_timeout=60
     )

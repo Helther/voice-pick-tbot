@@ -133,7 +133,10 @@ def get_emot_string(emot: str) -> str:
 
 
 def get_user_voice_dir(user_id: int) -> str:
-    return os.path.normpath(os.path.join(VOICES_PATH, str(user_id)))
+    voices_dir = os.path.normpath(os.path.join(VOICES_PATH, str(user_id)))
+    if not os.path.exists(voices_dir):
+        os.makedirs(voices_dir)
+    return voices_dir
 
 
 def sanitize_filename(filename: str) -> str:

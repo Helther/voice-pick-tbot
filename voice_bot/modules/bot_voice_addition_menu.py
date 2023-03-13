@@ -74,8 +74,6 @@ async def get_audio_files(update: Update, context: CallbackContext) -> int:
         file_path = os.path.join(new_voice_dir, file_name)
         filetype = ""
 
-        if not os.path.exists(voices_dir):
-            os.makedirs(voices_dir)
         if not os.path.exists(new_voice_dir):
             os.makedirs(new_voice_dir)
         current_duration = context.user_data.get(AddVoiceUserData.audio_duration.name, 0)
@@ -198,6 +196,8 @@ def get_add_voice_menu_handler() -> ConversationHandler:
                                               CallbackQueryHandler(cancel, pattern=VoiceMenuStates.cancel.name)],
             VoiceMenuStates.get_name.value: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_voice_name),
                                              CallbackQueryHandler(cancel, pattern=VoiceMenuStates.cancel.name)],
+            ConversationHandler.TIMEOUT: [CallbackQueryHandler(destroy_add_voice_menu)]
         },
-        fallbacks=[CallbackQueryHandler(destroy_add_voice_menu)]
+        fallbacks=[CallbackQueryHandler(destroy_add_voice_menu)],
+        conversation_timeout=300
     )
