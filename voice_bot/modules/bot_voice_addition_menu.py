@@ -10,6 +10,7 @@ from telegram.ext import (
 from telegram.error import BadRequest
 from modules.bot_utils import user_restricted, logger, sanitize_filename, get_user_voice_dir, convert_to_wav
 from modules.bot_db import db_handle
+from modules.bot_settings import MAX_USER_VOICES_COUNT
 from enum import Enum
 import os
 import shutil
@@ -18,12 +19,13 @@ from modules.bot_settings_menu import report_error
 from librosa import get_duration, load
 
 
-VOICE_DURATION_MIN = 20  # seconds
+VOICE_DURATION_MIN = 15  # seconds
 VOICE_DURATION_MAX = 120
 VOICE_ADDITION_MENU_TEXT = "Voice Addition Menu:"
 VOICE_ADDITION_GET_NAME_TEXT = "Provide a name for your voice:"
-VOICE_ADDITION_GET_AUDIO_TEXT = f"Send one or several audio files of intelligible speech\
-    \nUse wav, mp3 or voice recording, provide between {VOICE_DURATION_MIN}s and {VOICE_DURATION_MAX}s of audio\nThen press Accept:"
+VOICE_ADDITION_GET_AUDIO_TEXT = f"""Send one or several audio files of intelligible, clear speech
+    \nUse wav, mp3 or voice recordingthough quality wil likely be subpar), provide between {VOICE_DURATION_MIN}s and
+     {VOICE_DURATION_MAX}s of audio\nThen press Accept:"""
 
 
 class VoiceMenuStates(Enum):
@@ -57,7 +59,12 @@ ADD_VOICE_MARKUP = InlineKeyboardMarkup([[create_accept_button()], [create_cance
 
 @user_restricted
 async def add_voice_main_cmd(update: Update, context: CallbackContext) -> int:
-    # create setting message and provide buttons
+    # create setting message and provide buttons if addition is possible
+    voices = db_handle.get_user_voices(update.effective_user.id)
+    if len(voices) >= MAX_USER_VOICES_COUNT:
+        await update.message.reply_html((f"{VOICE_ADDITION_MENU_TEXT}\nError: you have exceeded maximum number of custom voices: {MAX_USER_VOICES_COUNT}\n"
+                                        "Please remove any custom voice via /settings and try again"))
+        return ConversationHandler.END
     await update.message.reply_text(f"{VOICE_ADDITION_MENU_TEXT}\n{VOICE_ADDITION_GET_NAME_TEXT}",
                                     reply_markup=InlineKeyboardMarkup([[create_cancel_button()]]))
     return VoiceMenuStates.get_name.value

@@ -2,6 +2,9 @@ from enum import Enum
 from modules.bot_db import db_handle
 
 
+MAX_USER_VOICES_COUNT = 20
+
+
 class Emotions(Enum):
     Neutral = 0
     Sad = 1

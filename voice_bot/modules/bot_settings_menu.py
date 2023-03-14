@@ -12,6 +12,7 @@ from enum import Enum
 from modules.bot_db import db_handle
 import json
 from itertools import zip_longest
+import shutil
 
 
 SETTINGS_MENU_TEXT = "Edit Settings:"
@@ -29,6 +30,7 @@ class SettingsMenuStates(Enum):
     select_samples = 3
     close_menu = 4
     back = 5
+    remove_voice = 6
 
 
 """-----------------------------------Menu constructors-----------------------------------"""
@@ -39,6 +41,7 @@ def build_settings_menu() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("Select Voice", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_voice.name)],
         [InlineKeyboardButton("Select Emotion", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_emotion.name)],
         [InlineKeyboardButton("Select Number Of Samples", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_samples.name)],
+        [InlineKeyboardButton("Remove Voice", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.remove_voice.name)],
         [InlineKeyboardButton("Close", callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.close_menu.name)]
     ]
     return InlineKeyboardMarkup(buttons)
@@ -61,15 +64,16 @@ EMOTIONS_MARKUP = build_emotion_menu()
 SAMPLES_MARKUP = build_samples_menu()
 
 
-def build_voices_list(user_id: int) -> InlineKeyboardMarkup:
+def build_voices_list(user_id: int, show_default: bool) -> InlineKeyboardMarkup:
     """
     voice btn callback is following json format:
     {
         is_default: False,
-        data: '0'
+        data: '0',
+        name: "voice"
     }
     """
-    default_voices = config.default_voices
+    default_voices = config.default_voices if show_default else []
     buttons_default_col = [InlineKeyboardButton(name, callback_data=QUERY_PATTERN_SETTINGS + json.dumps({"is_default": True, "data": name})) for name in default_voices]
     user_voices = db_handle.get_user_voices(user_id)  # tuples of (id, name)
     if user_voices:
@@ -99,6 +103,12 @@ async def report_error(query: CallbackQuery, menu_name: str, err_msg: str) -> No
     await query.edit_message_text(f"{menu_name}\nError: {err_msg}", reply_markup=None)
 
 
+async def get_query_data(query: CallbackQuery) -> str:
+    # and answer it
+    await query.answer()
+    return query.data[len(QUERY_PATTERN_SETTINGS):]
+
+
 @user_restricted
 async def settings_main_cmd(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text(SETTINGS_MENU_TEXT, reply_markup=SETTINGS_MARKUP)
@@ -110,8 +120,7 @@ async def settings_main_cmd(update: Update, context: CallbackContext) -> int:
 async def choose_setting(update: Update, context: CallbackContext) -> int:
     """Main settings menu"""
     query = update.callback_query
-    await query.answer()
-    data = query.data[len(QUERY_PATTERN_SETTINGS):]
+    data = await get_query_data(query)
     if data == SettingsMenuStates.select_emotion.name:
         try:
             active_emot = get_emotion_name(update.effective_user.id)
@@ -126,7 +135,7 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
     if data == SettingsMenuStates.select_voice.name:
         try:
             active_voice = db_handle.get_user_voice_setting(update.effective_user.id)
-            await query.edit_message_text(f"{VOICES_MENU_TEXT}\nCurrent: {active_voice}\nDefault voices:\tUser voices:", reply_markup=build_voices_list(update.effective_user.id))
+            await query.edit_message_text(f"{VOICES_MENU_TEXT}\nCurrent: {active_voice}\nDefault voices:\tUser voices:", reply_markup=build_voices_list(update.effective_user.id, True))
         except Exception as e:
             logger.error(msg="Exception while choose_setting: ", exc_info=e)
             await report_error(query, SETTINGS_MENU_TEXT, "Failed to fetch Voice setting")
@@ -145,6 +154,16 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
 
         return SettingsMenuStates.select_samples
 
+    if data == SettingsMenuStates.remove_voice.name:
+        try:
+            await query.edit_message_text(f"{VOICES_MENU_TEXT} (to remove)", reply_markup=build_voices_list(update.effective_user.id, False))
+        except Exception as e:
+            logger.error(msg="Exception while choose_setting: ", exc_info=e)
+            await report_error(query, SETTINGS_MENU_TEXT, "Failed to fetch User Voices")
+            return ConversationHandler.END
+
+        return SettingsMenuStates.remove_voice
+
     if data == SettingsMenuStates.close_menu.name:
         await query.edit_message_reply_markup()
         return ConversationHandler.END
@@ -152,8 +171,7 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
 
 async def choose_voice(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
-    await query.answer()
-    data = query.data[len(QUERY_PATTERN_SETTINGS):]
+    data = data = await get_query_data(query)
     if data != SettingsMenuStates.back.name:
         try:
             data_json = json.loads(data)
@@ -172,8 +190,7 @@ async def choose_voice(update: Update, context: CallbackContext) -> int:
 
 async def choose_emotion(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
-    await query.answer()
-    data = query.data[len(QUERY_PATTERN_SETTINGS):]
+    data = await get_query_data(query)
     if data != SettingsMenuStates.back.name:
         try:
             db_handle.update_emot_setting(update.effective_user.id, EMOTION_STRINGS[data].value)
@@ -188,8 +205,7 @@ async def choose_emotion(update: Update, context: CallbackContext) -> int:
 
 async def choose_samples(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
-    await query.answer()
-    data = query.data[len(QUERY_PATTERN_SETTINGS):]
+    data = await get_query_data(query)
     if data != SettingsMenuStates.back.name:
         try:
             db_handle.update_user_samples_setting(update.effective_user.id, int(data))
@@ -202,7 +218,27 @@ async def choose_samples(update: Update, context: CallbackContext) -> int:
     return SettingsMenuStates.select_setting
 
 
+async def rem_voice(update: Update, context: CallbackContext) -> int:
+    # remove selected voice form db and delete voice folder
+    query = update.callback_query
+    data = await get_query_data(query)
+    if data != SettingsMenuStates.back.name:
+        try:
+            data_json = json.loads(data)
+            voice_dir = db_handle.remove_user_voice(update.effective_user.id, int(data_json["data"]))
+            shutil.rmtree(voice_dir)
+        except Exception as e:
+            logger.error(msg="Exception while rem_voice: ", exc_info=e)
+            await report_error(query, SETTINGS_MENU_TEXT, "Failed to remove the Voice")
+            return ConversationHandler.END
+
+    await query.edit_message_text(SETTINGS_MENU_TEXT, reply_markup=SETTINGS_MARKUP)
+    return SettingsMenuStates.select_setting
+
+
 async def fallback(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    await query.answer()
     await update.effective_message.reply_text("Unexpected action performed during settings editing, please try again later")
     return ConversationHandler.END
 
@@ -218,7 +254,8 @@ def get_settings_menu_handler() -> ConversationHandler:
             SettingsMenuStates.select_setting: [CallbackQueryHandler(choose_setting, pattern=f"^{QUERY_PATTERN_SETTINGS}*")],
             SettingsMenuStates.select_voice: [CallbackQueryHandler(choose_voice, pattern=f"^{QUERY_PATTERN_SETTINGS}*")],
             SettingsMenuStates.select_emotion: [CallbackQueryHandler(choose_emotion, pattern=f"^{QUERY_PATTERN_SETTINGS}*")],
-            SettingsMenuStates.select_samples: [CallbackQueryHandler(choose_samples, pattern=f"^{QUERY_PATTERN_SETTINGS}*")]
+            SettingsMenuStates.select_samples: [CallbackQueryHandler(choose_samples, pattern=f"^{QUERY_PATTERN_SETTINGS}*")],
+            SettingsMenuStates.remove_voice: [CallbackQueryHandler(rem_voice, pattern=f"^{QUERY_PATTERN_SETTINGS}*")]
         },
         fallbacks=[CallbackQueryHandler(retry_button, pattern=f"^{QUERY_PATTERN_RETRY}*"), CallbackQueryHandler(fallback)],
         allow_reentry=True

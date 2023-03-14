@@ -2,6 +2,7 @@ import sqlite3
 import os
 from typing import List
 from modules.bot_utils import DATA_PATH, VOICES_PATH
+import shutil
 
 
 DB_NAME = "bot.db"
@@ -88,7 +89,7 @@ class DBHandle(object):
                     uid = int(user_voices_dir)
                     user_voices_path = os.path.join(VOICES_PATH, user_voices_dir)
                 except Exception:
-                    os.rmdir(user_voices_path)  # remove not uid named folders
+                    shutil.rmtree(user_voices_path)  # remove not uid named folders
                 else:
                     res = self.conn.execute(f"SELECT name FROM {VOICES_TABLE} WHERE user_fid={uid}")
                     user_voices_db = set([uid[0] for uid in res.fetchall()])
@@ -97,8 +98,8 @@ class DBHandle(object):
                         self.conn.execute(f"DELETE FROM {VOICES_TABLE} WHERE name='{v}' AND user_fid={uid}")
                         self.conn.execute(f"UPDATE {USERS_TABLE} SET default_voice='{DEFAULT_DEFAULT_VOICE}',voice_fid=NULL WHERE uid={uid}")
                     for v in voice_dirs - user_voices_db:
-                        self.conn.execute(f"""INSERT INTO {VOICES_TABLE} (user_fid,name,path)
-                                            VALUES ({uid},'{v}','{os.path.join(user_voices_path, v)}')""")
+                        self.conn.execute((f"INSERT INTO {VOICES_TABLE} (user_fid,name,path)"
+                                          f"VALUES ({uid},'{v}','{os.path.join(user_voices_path, v)}')"))
 
     def init_user(self, user_id: int) -> None:
         # check if user exists and create if not
@@ -130,6 +131,21 @@ class DBHandle(object):
         # return list of (id, name) tuples for user
         res = self.cursor.execute(f"SELECT id,name FROM {VOICES_TABLE} WHERE user_fid={user_id}")
         return res.fetchall()
+
+    def remove_user_voice(self, user_id: int, voice_id: int) -> str:
+        # check if removing active voice, if so reset to default in user table
+        path = None
+        with self.conn:
+            res = self.conn.execute((f"SELECT {USERS_TABLE}.voice_fid, {VOICES_TABLE}.path "
+                                     f"FROM {USERS_TABLE} "
+                                     f"LEFT JOIN {VOICES_TABLE} ON {VOICES_TABLE}.id={voice_id} "
+                                     f"WHERE {USERS_TABLE}.uid={user_id}"))
+            voice_fid, path = res.fetchone()
+            if voice_fid == voice_id:
+                self.conn.execute(f"UPDATE {USERS_TABLE} SET default_voice='{DEFAULT_DEFAULT_VOICE}',voice_fid=NULL WHERE uid={user_id}")
+            self.conn.execute(f"DELETE FROM {VOICES_TABLE} WHERE id={voice_id}")
+
+        return path
 
     def get_user_voice_setting(self, user_id: int) -> str:
         res = self.cursor.execute(f"""SELECT {USERS_TABLE}.default_voice, {USERS_TABLE}.voice_fid,{VOICES_TABLE}.name

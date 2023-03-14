@@ -91,7 +91,7 @@ async def help_cmd(update: Update, context: CallbackContext) -> None:
                 "it may takes some time, depending on text length (from couple of seconds for a short sentence to "
                 "couple of minutes for essays)\n"
                 "<u>/add_voice</u> - to start a guided process of adding user voice for cloning, by providing the name and audio samples "
-                "via files or voice recording\n"
+                "via files or voice recording(though voice quality will likely be subpar with bad mic recording)\n"
                 "<u>/settings</u> - change user specific settings for voice synthesis\n"
                 f"Take a look at source code for additional info at <a href='{SOURCE_WEB_LINK}'>GitHub</a>")
     await update.message.reply_html(help_msg)
