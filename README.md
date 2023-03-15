@@ -12,7 +12,7 @@ Here's the preview:
  * custom voice adding
  
 ### Prerequisites
- * NVIDIA GPU (between 4 and 8Gb of VRAM required for inference)
+ * NVIDIA GPU (between 4 and 10Gb of VRAM required for inference, depending on tortoise settings)
  * python 3.10.6
  * pip or anaconda env with python 3.10.6
  * ffmpeg
@@ -37,7 +37,6 @@ You can also try to add different emotions to sentences by prepending parts of t
 notations (For more info please visit [the original model source page](https://github.com/neonbjb/tortoise-tts)).
 
 ### TODO
- * add language support for ui - ru,en
  * add progress mesg for current job, send_action(ChatAction.RECORD_VOICE)
  * add voice to voice conversion, start from keyboard, use conversation and https://github.com/openai/whisper
  * add inline generation through conversation with command

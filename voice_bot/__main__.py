@@ -31,6 +31,11 @@ async def init_bot_settings() -> Bot:
             ("settings", "Customize audio synthesis parameters"),
             ("help", "Get command usage help")]
     await bot.set_my_commands(commands=cmds, language_code="en")
+    cmds = [("gen", "Синтезировать аудио из предоставленного текста"),
+            ("add_voice", "Добавить пользовательский голос"),
+            ("settings", "Изменить настройки синтеза"),
+            ("help", "Вызвать подсказку по использованию бота")]
+    await bot.set_my_commands(commands=cmds, language_code="ru")
     return bot
 
 

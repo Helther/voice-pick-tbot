@@ -66,6 +66,7 @@ config = Config()
 
 
 def validate_text(text: str) -> bool:
+    # TODO
     return text
 
 
@@ -122,7 +123,9 @@ def user_restricted(func: Callable):
         if user_id != config.user_id and config.is_user_specified():
             logger.debug(f"Unauthorized call of {func.__name__} by user: {user.full_name}, with id: {user_id}")
             if update.effective_message:
-                await update.effective_message.reply_html(f"Sorry, {user.mention_html()}, it's a private bot, access denied")
+                reply = get_text_locale(user, {"ru": f"{user.mention_html()}, в доступе отказано, к сожалению это частный бот"},
+                                        f"Sorry, {user.mention_html()}, it's a private bot, access denied")
+                await update.effective_message.reply_html(reply)
             return  # quit function
 
         log_cmd(user, func.__name__)
@@ -158,3 +161,16 @@ def sanitize_filename(filename: str) -> str:
 
 async def answer_query(query) -> None:
     await query.answer()
+
+
+def get_text_locale(user, locales: dict, default: str) -> str:
+    """
+    returns localized text based upon user language_code
+    locales - dict of language_code: string
+    default - fallback string if code is not set or absent
+    """
+    if user is not None:
+        for k, v in locales.items():
+            if k in user.language_code:
+                return v
+    return default
