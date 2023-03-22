@@ -20,6 +20,7 @@ MODELS_PATH = os.path.join(DATA_PATH, "models")
 VOICES_PATH = os.path.join(DATA_PATH, "user_voices")
 QUERY_PATTERN_RETRY = "c_re"
 SOURCE_WEB_LINK = "https://github.com/Helther/voice-pick-tbot"
+FOLDER_CHAR_LIMIT = os.statvfs(VOICES_PATH).f_namemax
 
 
 # Enable logging
@@ -81,7 +82,10 @@ def convert_to_voice(filename: str) -> str:
         subprocess.run(f"{convert_to_voice_cmd}", shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         traceback.print_exc(file=sys.stdout)
-        os.remove(result_file)
+        try:
+            os.remove(result_file)  # may not produce the result
+        except Exception:
+            pass
         result_file = None
 
     return result_file
@@ -123,7 +127,7 @@ def user_restricted(func: Callable):
         if user_id != config.user_id and config.is_user_specified():
             logger.debug(f"Unauthorized call of {func.__name__} by user: {user.full_name}, with id: {user_id}")
             if update.effective_message:
-                reply = get_text_locale(user, {"ru": f"{user.mention_html()}, в доступе отказано, к сожалению это частный бот"},
+                reply = get_text_locale(user, get_cis_locale_dict(f"{user.mention_html()}, в доступе отказано, к сожалению это частный бот"),
                                         f"Sorry, {user.mention_html()}, it's a private bot, access denied")
                 await update.effective_message.reply_html(reply)
             return  # quit function
@@ -145,8 +149,6 @@ def get_user_voice_dir(user_id: int) -> str:
 
 
 def sanitize_filename(filename: str) -> str:
-    char_limit = 255
-
     # replace spaces
     filename.replace(' ', '_')
 
@@ -156,7 +158,7 @@ def sanitize_filename(filename: str) -> str:
     # keep only whitelisted chars
     whitelist = "-_.() %s%s" % (string.ascii_letters, string.digits)
     cleaned_filename = ''.join(c for c in cleaned_filename if c in whitelist)
-    return cleaned_filename[:char_limit]
+    return cleaned_filename[:FOLDER_CHAR_LIMIT]
 
 
 async def answer_query(query) -> None:
@@ -174,3 +176,8 @@ def get_text_locale(user, locales: dict, default: str) -> str:
             if k in user.language_code:
                 return v
     return default
+
+
+def get_cis_locale_dict(text: str) -> dict:
+    # returns locales dict for CIS countries that may use ru lang
+    return {"ab": text, "be": text, "kk": text, "ky": text, "ru": text}

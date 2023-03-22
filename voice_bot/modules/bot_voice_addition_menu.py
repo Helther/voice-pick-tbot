@@ -8,7 +8,7 @@ from telegram.ext import (
     filters
 )
 from telegram.error import BadRequest
-from modules.bot_utils import user_restricted, logger, sanitize_filename, get_user_voice_dir, convert_to_wav, get_text_locale
+from modules.bot_utils import user_restricted, logger, sanitize_filename, get_user_voice_dir, convert_to_wav, get_text_locale, get_cis_locale_dict
 from modules.bot_db import db_handle
 from modules.bot_settings import MAX_USER_VOICES_COUNT
 from enum import Enum
@@ -22,12 +22,12 @@ from librosa import get_duration, load
 VOICE_DURATION_MIN = 15  # seconds
 VOICE_DURATION_MAX = 120
 VOICE_ADDITION_MENU_TEXT = "Voice Addition Menu:"
-VOICE_ADDITION_GET_NAME_TEXT = "Provide a text message with a name for the new voice:"
+VOICE_ADDITION_GET_NAME_TEXT = "Provide a text message with a name for the new voice (use latin):"
 VOICE_ADDITION_GET_AUDIO_TEXT = f"""Send one or several audio files of intelligible, clear speech
     \nUse wav, mp3 or voice recordingthough quality wil likely be subpar), provide between {VOICE_DURATION_MIN}s and
      {VOICE_DURATION_MAX}s of audio\nThen press 'Accept':"""
 VOICE_ADDITION_MENU_TEXT_RU = "Меню добавления голоса:"
-VOICE_ADDITION_GET_NAME_TEXT_RU = "Отправьте сообщение с именем нового голоса:"
+VOICE_ADDITION_GET_NAME_TEXT_RU = "Отправьте текстовое сообщение с именем нового голоса (используйте латиницу):"
 VOICE_ADDITION_GET_AUDIO_TEXT_RU = (f"Отправьте один или множество аудио файлов разборчивой чистой речи "
                                     f"в формате wav, mp3 или голосовую запись(чем хуже качество записи - тем хуже точность голоса), предоставьте от {VOICE_DURATION_MIN}сек. до "
                                     f"{VOICE_DURATION_MAX}сек. аудио\nПосле чего нажмите 'Принять':")
@@ -52,12 +52,12 @@ class AddVoiceUserData(Enum):
 
 
 def create_accept_button(user: User) -> InlineKeyboardButton:
-    acc_str = get_text_locale(user, {"ru": "Принять"}, "Accept")
+    acc_str = get_text_locale(user, get_cis_locale_dict("Принять"), "Accept")
     return InlineKeyboardButton(acc_str, callback_data=VoiceMenuStates.accept.name)
 
 
 def create_cancel_button(user: User) -> InlineKeyboardButton:
-    cancel_str = get_text_locale(user, {"ru": "Отмена"}, "Cancel")
+    cancel_str = get_text_locale(user, get_cis_locale_dict("Отмена"), "Cancel")
     return InlineKeyboardButton(cancel_str, callback_data=VoiceMenuStates.cancel.name)
 
 
@@ -70,13 +70,13 @@ async def add_voice_main_cmd(update: Update, context: CallbackContext) -> int:
     # create setting message and provide buttons if addition is possible
     voices = db_handle.get_user_voices(update.effective_user.id)
     if len(voices) >= MAX_USER_VOICES_COUNT:
-        reply = get_text_locale(update.effective_user, {"ru": (f"{VOICE_ADDITION_MENU_TEXT_RU}\nОшибка: вы превысили максимальное число пользовательских голосов: {MAX_USER_VOICES_COUNT}\n"
-                                                               "Пожалуйста удалите лишний голос через меню /settings и попробуйте снова")},
+        reply = get_text_locale(update.effective_user, get_cis_locale_dict((f"{VOICE_ADDITION_MENU_TEXT_RU}\nОшибка: вы превысили максимальное число пользовательских голосов: {MAX_USER_VOICES_COUNT}\n"
+                                                                            "Пожалуйста удалите лишний голос через меню /settings и попробуйте снова")),
                                 (f"{VOICE_ADDITION_MENU_TEXT}\nError: you have exceeded maximum number of custom voices: {MAX_USER_VOICES_COUNT}\n"
                                 "Please remove any custom voice via /settings and try again"))
         await update.message.reply_html(reply)
         return ConversationHandler.END
-    reply = get_text_locale(update.effective_user, {"ru": f"{VOICE_ADDITION_MENU_TEXT_RU}\n{VOICE_ADDITION_GET_NAME_TEXT_RU}"}, f"{VOICE_ADDITION_MENU_TEXT}\n{VOICE_ADDITION_GET_NAME_TEXT}")
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"{VOICE_ADDITION_MENU_TEXT_RU}\n{VOICE_ADDITION_GET_NAME_TEXT_RU}"), f"{VOICE_ADDITION_MENU_TEXT}\n{VOICE_ADDITION_GET_NAME_TEXT}")
     await update.message.reply_text(reply, reply_markup=InlineKeyboardMarkup([[create_cancel_button(update.effective_user)]]))
     return VoiceMenuStates.get_name.value
 
@@ -123,7 +123,7 @@ async def get_audio_files(update: Update, context: CallbackContext) -> int:
 
     except Exception as e:
         logger.error(msg="Exception while get_audio_files in Add voice menu", exc_info=e)
-        reply = get_text_locale(update.effective_user, {"ru": "Внутренняя ошибка сервера: пожалуйста повторите попытку"}, "Internal Server Error: try again later please")
+        reply = get_text_locale(update.effective_user, get_cis_locale_dict("Внутренняя ошибка сервера: пожалуйста повторите попытку"), "Internal Server Error: try again later please")
         await update.message.reply_text(reply)
         return await destroy_add_voice_menu(update, context)
 
@@ -138,12 +138,12 @@ async def get_voice_name(update: Update, context: CallbackContext) -> int:
         user_voices = [name for id, name in user_voices]
         assert name and (user_voices is None or name not in user_voices)
         context.user_data[AddVoiceUserData.voice_name.name] = name
-        reply = get_text_locale(update.effective_user, {"ru": f"{VOICE_ADDITION_MENU_TEXT_RU}\nИмя голоса: {name}\n{VOICE_ADDITION_GET_AUDIO_TEXT_RU}"},
+        reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"{VOICE_ADDITION_MENU_TEXT_RU}\nИмя голоса: {name}\n{VOICE_ADDITION_GET_AUDIO_TEXT_RU}"),
                                 f"{VOICE_ADDITION_MENU_TEXT}\nVoice name: {name}\n{VOICE_ADDITION_GET_AUDIO_TEXT}")
         await update.message.reply_text(reply, reply_markup=create_markup(update.effective_user))
     except Exception as e:
         logger.error(msg="Exception while get_voice_name in Add voice menu", exc_info=e)
-        reply = get_text_locale(update.effective_user, {"ru": "Ошибка: предоставлено недоступное имя, попробуйте еще раз"},
+        reply = get_text_locale(update.effective_user, get_cis_locale_dict("Ошибка: предоставлено недоступное имя, попробуйте еще раз"),
                                 "Error: invalid voice name provided, please try again")
         await update.message.reply_text(reply)
         return VoiceMenuStates.get_name.value  # second chance
@@ -157,14 +157,14 @@ async def accept(update: Update, context: CallbackContext) -> int:
         await query.answer()
 
         current_voice_files = context.user_data.get(AddVoiceUserData.file_names.name, [])
-        added_files_str = get_text_locale(update.effective_user, {"ru": "\nДобавленные файлы:"}, "\nAdded audio files:")
+        added_files_str = get_text_locale(update.effective_user, get_cis_locale_dict("\nДобавленные файлы:"), "\nAdded audio files:")
         for file in current_voice_files:
             added_files_str += f"\n{file}"
         current_duration = context.user_data.get(AddVoiceUserData.audio_duration.name, 0)
         if VOICE_DURATION_MIN > current_duration:
             try:
-                reply = get_text_locale(update.effective_user, {"ru": (f"{VOICE_ADDITION_MENU_TEXT_RU}\nНедостаточная длительность аудио (минимум {VOICE_DURATION_MIN} сек.), "
-                                                                       f"добавьте больше файлов пожалуйста (текущая длительность: {current_duration} сек.){added_files_str}")},
+                reply = get_text_locale(update.effective_user, get_cis_locale_dict((f"{VOICE_ADDITION_MENU_TEXT_RU}\nНедостаточная длительность аудио (минимум {VOICE_DURATION_MIN} сек.), "
+                                                                                    f"добавьте больше файлов пожалуйста (текущая длительность: {current_duration} сек.){added_files_str}")),
                                         (f"{VOICE_ADDITION_MENU_TEXT}\nAudio duration is too short (minimum is {VOICE_DURATION_MIN}s), "
                                         f"add more please (current duration: {current_duration}s){added_files_str}"))
                 await query.edit_message_text(reply, reply_markup=create_markup(update.effective_user))
@@ -173,8 +173,8 @@ async def accept(update: Update, context: CallbackContext) -> int:
             return VoiceMenuStates.get_audio.value
         elif current_duration > VOICE_DURATION_MAX:
             try:
-                reply = get_text_locale(update.effective_user, {"ru": (f"{VOICE_ADDITION_MENU_TEXT_RU}\nИзбыточная длительность аудио "
-                                                                       f"(максимум {VOICE_DURATION_MAX} сек. (текущая длительность: {current_duration} сек.){added_files_str}")},
+                reply = get_text_locale(update.effective_user, get_cis_locale_dict((f"{VOICE_ADDITION_MENU_TEXT_RU}\nИзбыточная длительность аудио "
+                                                                                    f"(максимум {VOICE_DURATION_MAX} сек. (текущая длительность: {current_duration} сек.){added_files_str}")),
                                         (f"{VOICE_ADDITION_MENU_TEXT}\nAudio duration is too long "
                                         f"(maximum is {VOICE_DURATION_MAX}s (current duration: {current_duration}s){added_files_str}"))
                 await query.edit_message_text(reply, reply_markup=create_markup(update.effective_user))
@@ -185,7 +185,7 @@ async def accept(update: Update, context: CallbackContext) -> int:
         name = context.user_data[AddVoiceUserData.voice_name.name]
         db_handle.insert_user_voice(update.effective_user.id, name,
                                     os.path.join(get_user_voice_dir(update.effective_user.id), name))
-        reply = get_text_locale(update.effective_user, {"ru": f"{VOICE_ADDITION_MENU_TEXT_RU}\nНовый голос был успешно добавлен: {name}"},
+        reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"{VOICE_ADDITION_MENU_TEXT_RU}\nНовый голос был успешно добавлен: {name}"),
                                 f"{VOICE_ADDITION_MENU_TEXT}\nSuccessfully added new voice: {name}")
         await query.edit_message_text(reply)
         AddVoiceUserData.clear_user_data(context.user_data)
@@ -193,8 +193,8 @@ async def accept(update: Update, context: CallbackContext) -> int:
 
     except Exception as e:
         logger.error(msg="Exception while accept in Add voice menu", exc_info=e)
-        menu_name = get_text_locale(update.effective_user, {"ru": VOICE_ADDITION_MENU_TEXT_RU}, VOICE_ADDITION_MENU_TEXT)
-        msg = get_text_locale(update.effective_user, {"ru": "Ошибка: не удалось добавить новый голос"}, "Error: Failed to create the new voice")
+        menu_name = get_text_locale(update.effective_user, get_cis_locale_dict(VOICE_ADDITION_MENU_TEXT_RU), VOICE_ADDITION_MENU_TEXT)
+        msg = get_text_locale(update.effective_user, get_cis_locale_dict("Ошибка: не удалось добавить новый голос"), "Error: Failed to create the new voice")
         await report_error(query, menu_name, msg)
         return await destroy_add_voice_menu(update, context)
 
@@ -218,14 +218,14 @@ async def destroy_add_voice_menu(update: Update, context: CallbackContext) -> in
         await query.answer()
     cleanup_data(update.effective_user.id, context.user_data.get(AddVoiceUserData.voice_name.name, None), context.user_data)
     if query:
-        reply = get_text_locale(update.effective_user, {"ru": "Добавление нового голоса было отменено"}, "Voice addition exited")
+        reply = get_text_locale(update.effective_user, get_cis_locale_dict("Добавление нового голоса было отменено"), "Voice addition exited")
         await query.edit_message_text(reply)
     return ConversationHandler.END
 
 
 async def fallback(update: Update, context: CallbackContext) -> int:
     cleanup_data(update.effective_user.id, context.user_data.get(AddVoiceUserData.voice_name.name, None), context.user_data)
-    reply = get_text_locale(update.effective_user, {"ru": "Добавление нового голоса было не завершено, отмена... пожалуйста повторите позже"},
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict("Добавление нового голоса было не завершено, отмена... пожалуйста повторите позже"),
                             "Voice addition left unfinished, cancelling... please try again later")
     await update.effective_message.reply_text(reply)
     return ConversationHandler.END

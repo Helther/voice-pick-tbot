@@ -5,7 +5,7 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
-from modules.bot_utils import user_restricted, answer_query, get_text_locale, config, logger, QUERY_PATTERN_RETRY
+from modules.bot_utils import user_restricted, answer_query, get_text_locale, get_cis_locale_dict, config, logger, QUERY_PATTERN_RETRY
 from modules.bot_handlers import retry_button
 from modules.bot_settings import EMOTION_STRINGS, get_emotion_name
 from enum import Enum
@@ -46,24 +46,24 @@ class SettingsMenuStates(Enum):
 
 def build_settings_menu(user: User) -> InlineKeyboardMarkup:
     buttons = [
-        [InlineKeyboardButton(get_text_locale(user, {"ru": "Выбрать голос"}, "Select Voice"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_voice.name)],
-        [InlineKeyboardButton(get_text_locale(user, {"ru": "Выбрать эмоцию"}, "Select Emotion"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_emotion.name)],
-        [InlineKeyboardButton(get_text_locale(user, {"ru": "Выбрать число генерируемых аудио"}, "Select Number Of Samples"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_samples.name)],
-        [InlineKeyboardButton(get_text_locale(user, {"ru": "Удалить голос"}, "Remove Voice"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.remove_voice.name)],
-        [InlineKeyboardButton(get_text_locale(user, {"ru": "Закрыть"}, "Close"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.close_menu.name)]
+        [InlineKeyboardButton(get_text_locale(user, get_cis_locale_dict("Выбрать голос"), "Select Voice"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_voice.name)],
+        [InlineKeyboardButton(get_text_locale(user, get_cis_locale_dict("Выбрать эмоцию"), "Select Emotion"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_emotion.name)],
+        [InlineKeyboardButton(get_text_locale(user, get_cis_locale_dict("Выбрать число генерируемых аудио"), "Select Number Of Samples"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.select_samples.name)],
+        [InlineKeyboardButton(get_text_locale(user, get_cis_locale_dict("Удалить голос"), "Remove Voice"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.remove_voice.name)],
+        [InlineKeyboardButton(get_text_locale(user, get_cis_locale_dict("Закрыть"), "Close"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.close_menu.name)]
     ]
     return InlineKeyboardMarkup(buttons)
 
 
 def build_emotion_menu(user: User) -> InlineKeyboardMarkup:
     buttons = [[InlineKeyboardButton(emot_str, callback_data=QUERY_PATTERN_SETTINGS + emot_str)] for emot_str in EMOTION_STRINGS.keys()]
-    buttons.append([InlineKeyboardButton(get_text_locale(user, {"ru": "Назад"}, "Back"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.back.name)])
+    buttons.append([InlineKeyboardButton(get_text_locale(user, get_cis_locale_dict("Назад"), "Back"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.back.name)])
     return InlineKeyboardMarkup(buttons)
 
 
 def build_samples_menu(user: User) -> InlineKeyboardMarkup:
     buttons = [[InlineKeyboardButton(str(ind), callback_data=QUERY_PATTERN_SETTINGS + str(ind))] for ind in range(1, SAMPLES_MENU_COUNT_MAX + 1)]
-    buttons.append([InlineKeyboardButton(get_text_locale(user, {"ru": "Назад"}, "Back"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.back.name)])
+    buttons.append([InlineKeyboardButton(get_text_locale(user, get_cis_locale_dict("Назад"), "Back"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.back.name)])
     return InlineKeyboardMarkup(buttons)
 
 
@@ -90,14 +90,14 @@ def build_voices_list(user: User, show_default: bool) -> InlineKeyboardMarkup:
             menu[len(menu) - 1].append(default)
         if custom:
             menu[len(menu) - 1].append(custom)
-    menu.append([InlineKeyboardButton(get_text_locale(user, {"ru": "Назад"}, "Back"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.back.name)])
+    menu.append([InlineKeyboardButton(get_text_locale(user, get_cis_locale_dict("Назад"), "Back"), callback_data=QUERY_PATTERN_SETTINGS + SettingsMenuStates.back.name)])
     return InlineKeyboardMarkup(menu)
 
 
 async def destroy_setings_menu(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     context.application.create_task(answer_query(query), update=update)
-    reply = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU + "\nВыход"}, SETTINGS_MENU_TEXT + "\nExited")
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU + "\nВыход"), SETTINGS_MENU_TEXT + "\nExited")
     await query.edit_message_text(reply)
     return ConversationHandler.END
 
@@ -114,7 +114,7 @@ async def get_query_data(query: CallbackQuery) -> str:
 
 @user_restricted
 async def settings_main_cmd(update: Update, context: CallbackContext) -> int:
-    reply = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
     await update.message.reply_text(reply, reply_markup=build_settings_menu(update.effective_user))
     return SettingsMenuStates.select_setting
 
@@ -128,12 +128,12 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
     if data == SettingsMenuStates.select_emotion.name:
         try:
             active_emot = get_emotion_name(update.effective_user.id)
-            reply = get_text_locale(update.effective_user, {"ru": f"{EMOT_MENU_TEXT_RU}\nТекущая: {active_emot}"}, f"{EMOT_MENU_TEXT}\nCurrent: {active_emot}")
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"{EMOT_MENU_TEXT_RU}\nТекущая: {active_emot}"), f"{EMOT_MENU_TEXT}\nCurrent: {active_emot}")
             await query.edit_message_text(reply, reply_markup=build_emotion_menu(update.effective_user))
         except Exception as e:
             logger.error(msg="Exception while choose_setting: ", exc_info=e)
-            reply_menu = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
-            reply = get_text_locale(update.effective_user, {"ru": MENU_LOAD_ERR_RU}, MENU_LOAD_ERR)
+            reply_menu = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(MENU_LOAD_ERR_RU), MENU_LOAD_ERR)
             await report_error(query, reply_menu, reply)
             return ConversationHandler.END
 
@@ -142,12 +142,12 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
     if data == SettingsMenuStates.select_voice.name:
         try:
             active_voice = db_handle.get_user_voice_setting(update.effective_user.id)
-            reply = get_text_locale(update.effective_user, {"ru": f"{VOICES_MENU_TEXT_RU}\nТекущий: {active_voice}\nСтандартные голоса:\tПользов. голоса:"}, f"{VOICES_MENU_TEXT}\nCurrent: {active_voice}\nDefault voices:\tUser voices:")
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"{VOICES_MENU_TEXT_RU}\nТекущий: {active_voice}\nСтандартные голоса:\tПользов. голоса:"), f"{VOICES_MENU_TEXT}\nCurrent: {active_voice}\nDefault voices:\tUser voices:")
             await query.edit_message_text(reply, reply_markup=build_voices_list(update.effective_user, True))
         except Exception as e:
             logger.error(msg="Exception while choose_setting: ", exc_info=e)
-            reply_menu = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
-            reply = get_text_locale(update.effective_user, {"ru": MENU_LOAD_ERR_RU}, MENU_LOAD_ERR)
+            reply_menu = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(MENU_LOAD_ERR_RU), MENU_LOAD_ERR)
             await report_error(query, reply_menu, reply)
             return ConversationHandler.END
 
@@ -156,12 +156,12 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
     if data == SettingsMenuStates.select_samples.name:
         try:
             samples_num = db_handle.get_user_samples_setting(update.effective_user.id)
-            reply = get_text_locale(update.effective_user, {"ru": f"{SAMPLES_MENU_TEXT_RU}\nТекущее: {samples_num}"}, f"{SAMPLES_MENU_TEXT}\nCurrent: {samples_num}")
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"{SAMPLES_MENU_TEXT_RU}\nТекущее: {samples_num}"), f"{SAMPLES_MENU_TEXT}\nCurrent: {samples_num}")
             await query.edit_message_text(reply, reply_markup=build_samples_menu(update.effective_user))
         except Exception as e:
             logger.error(msg="Exception while choose_setting: ", exc_info=e)
-            reply_menu = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
-            reply = get_text_locale(update.effective_user, {"ru": MENU_LOAD_ERR_RU}, MENU_LOAD_ERR)
+            reply_menu = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(MENU_LOAD_ERR_RU), MENU_LOAD_ERR)
             await report_error(query, reply_menu, reply)
             return ConversationHandler.END
 
@@ -169,12 +169,12 @@ async def choose_setting(update: Update, context: CallbackContext) -> int:
 
     if data == SettingsMenuStates.remove_voice.name:
         try:
-            reply = get_text_locale(update.effective_user, {"ru": f"{VOICES_MENU_TEXT_RU} (для удаления)"}, f"{VOICES_MENU_TEXT} (to remove)")
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"{VOICES_MENU_TEXT_RU} (для удаления)"), f"{VOICES_MENU_TEXT} (to remove)")
             await query.edit_message_text(reply, reply_markup=build_voices_list(update.effective_user, False))
         except Exception as e:
             logger.error(msg="Exception while choose_setting: ", exc_info=e)
-            reply_menu = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
-            reply = get_text_locale(update.effective_user, {"ru": MENU_LOAD_ERR_RU}, MENU_LOAD_ERR)
+            reply_menu = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(MENU_LOAD_ERR_RU), MENU_LOAD_ERR)
             await report_error(query, reply_menu, reply)
             return ConversationHandler.END
 
@@ -197,12 +197,12 @@ async def choose_voice(update: Update, context: CallbackContext) -> int:
                 db_handle.update_user_voice_setting(update.effective_user.id, int(data_json["data"]))
         except Exception as e:
             logger.error(msg="Exception while choose_voice: ", exc_info=e)
-            reply_menu = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
-            reply = get_text_locale(update.effective_user, {"ru": MENU_SET_ERR_RU}, MENU_SET_ERR)
+            reply_menu = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(MENU_SET_ERR_RU), MENU_SET_ERR)
             await report_error(query, reply_menu, reply)
             return ConversationHandler.END
 
-    reply = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
     await query.edit_message_text(reply, reply_markup=build_settings_menu(update.effective_user))
     return SettingsMenuStates.select_setting
 
@@ -215,12 +215,12 @@ async def choose_emotion(update: Update, context: CallbackContext) -> int:
             db_handle.update_emot_setting(update.effective_user.id, EMOTION_STRINGS[data].value)
         except Exception as e:
             logger.error(msg="Exception while choose_voice: ", exc_info=e)
-            reply_menu = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
-            reply = get_text_locale(update.effective_user, {"ru": MENU_SET_ERR_RU}, MENU_SET_ERR)
+            reply_menu = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(MENU_SET_ERR_RU), MENU_SET_ERR)
             await report_error(query, reply_menu, reply)
             return ConversationHandler.END
 
-    reply = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
     await query.edit_message_text(reply, reply_markup=build_settings_menu(update.effective_user))
     return SettingsMenuStates.select_setting
 
@@ -233,12 +233,12 @@ async def choose_samples(update: Update, context: CallbackContext) -> int:
             db_handle.update_user_samples_setting(update.effective_user.id, int(data))
         except Exception as e:
             logger.error(msg="Exception while choose_samples: ", exc_info=e)
-            reply_menu = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
-            reply = get_text_locale(update.effective_user, {"ru": MENU_SET_ERR_RU}, MENU_SET_ERR)
+            reply_menu = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict(MENU_SET_ERR_RU), MENU_SET_ERR)
             await report_error(query, reply_menu, reply)
             return ConversationHandler.END
 
-    reply = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
     await query.edit_message_text(reply, reply_markup=build_settings_menu(update.effective_user))
     return SettingsMenuStates.select_setting
 
@@ -254,12 +254,12 @@ async def rem_voice(update: Update, context: CallbackContext) -> int:
             shutil.rmtree(voice_dir)
         except Exception as e:
             logger.error(msg="Exception while rem_voice: ", exc_info=e)
-            reply_menu = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
-            reply = get_text_locale(update.effective_user, {"ru": "Не удалось удалить голос"}, "Failed to remove the Voice")
+            reply_menu = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
+            reply = get_text_locale(update.effective_user, get_cis_locale_dict("Не удалось удалить голос"), "Failed to remove the Voice")
             await report_error(query, reply_menu, reply)
             return ConversationHandler.END
 
-    reply = get_text_locale(update.effective_user, {"ru": SETTINGS_MENU_TEXT_RU}, SETTINGS_MENU_TEXT)
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict(SETTINGS_MENU_TEXT_RU), SETTINGS_MENU_TEXT)
     await query.edit_message_text(reply, reply_markup=build_settings_menu(update.effective_user))
     return SettingsMenuStates.select_setting
 
@@ -267,7 +267,7 @@ async def rem_voice(update: Update, context: CallbackContext) -> int:
 async def fallback(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     await query.answer()
-    reply = get_text_locale(update.effective_user, {"ru": "Неожиданная ошибка в меню, попробуйте снова позже"}, "Unexpected action performed during settings editing, please try again later")
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict("Неожиданная ошибка в меню, попробуйте снова позже"), "Unexpected action performed during settings editing, please try again later")
     await update.effective_message.reply_text(reply)
     return ConversationHandler.END
 
