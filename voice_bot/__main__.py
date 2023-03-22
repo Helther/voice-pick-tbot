@@ -1,13 +1,15 @@
 from telegram.ext import (
     Application,
     CommandHandler,
-    CallbackQueryHandler
+    CallbackQueryHandler,
+    MessageHandler,
+    filters
 )
 from telegram import Bot
 import asyncio
 import os.path
 from os import makedirs
-from modules.bot_handlers import start_cmd, gen_audio_cmd, help_cmd, retry_button, error_handler, QUERY_PATTERN_RETRY, tts_work_thread
+from modules.bot_handlers import start_cmd, gen_audio_cmd, help_cmd, gen_audio_inline, retry_button, error_handler, toggle_inline_cmd, QUERY_PATTERN_RETRY, tts_work_thread
 from modules.bot_settings_menu import get_settings_menu_handler
 from modules.bot_voice_addition_menu import get_add_voice_menu_handler
 import modules.bot_utils as utils
@@ -28,14 +30,10 @@ async def init_bot_settings() -> Bot:
     bot = Bot(utils.config.token)
     cmds = [("gen", "Synthesize audio from provided text"),
             ("add_voice", "Add your custom voice"),
+            ("toggle_inline", "Toggle audio generation via text message"),
             ("settings", "Customize audio synthesis parameters"),
             ("help", "Get command usage help")]
     await bot.set_my_commands(commands=cmds, language_code="en")
-    cmds = [("gen", "Синтезировать аудио из предоставленного текста"),
-            ("add_voice", "Добавить пользовательский голос"),
-            ("settings", "Изменить настройки синтеза"),
-            ("help", "Вызвать подсказку по использованию бота")]
-    await bot.set_my_commands(commands=cmds, language_code="ru")
     return bot
 
 
@@ -54,10 +52,12 @@ def run_application() -> None:
 
     application.add_handler(CommandHandler("start", start_cmd))
     application.add_handler(CommandHandler("gen", gen_audio_cmd))
+    application.add_handler(CommandHandler("toggle_inline", toggle_inline_cmd))
     application.add_handler(CommandHandler("help", help_cmd))
     application.add_handler(get_settings_menu_handler())
     application.add_handler(get_add_voice_menu_handler())
     application.add_handler(CallbackQueryHandler(retry_button, pattern=f"^{QUERY_PATTERN_RETRY}*"))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, gen_audio_inline))
 
     application.add_error_handler(error_handler)
 

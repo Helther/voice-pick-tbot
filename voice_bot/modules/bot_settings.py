@@ -3,6 +3,7 @@ from modules.bot_db import db_handle
 
 
 MAX_USER_VOICES_COUNT = 20
+TOGGLE_GEN_INLINE_KEY = "toggle_gen_inline"
 
 
 class Emotions(Enum):

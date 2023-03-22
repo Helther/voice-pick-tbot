@@ -39,7 +39,6 @@ notations (For more info please visit [the original model source page](https://g
 ### TODO
  * add progress mesg for current job, send_action(ChatAction.RECORD_VOICE)
  * add voice to voice conversion, start from keyboard, use conversation and https://github.com/openai/whisper
- * add inline generation through conversation with command
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

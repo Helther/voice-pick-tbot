@@ -23,7 +23,7 @@ from modules.bot_utils import (
 )
 from modules.tortoise_api import tts_audio_from_text
 from modules.bot_db import db_handle
-from modules.bot_settings import get_user_settings, UserSettings
+from modules.bot_settings import get_user_settings, UserSettings, TOGGLE_GEN_INLINE_KEY
 from modules.bot_utils import SOURCE_WEB_LINK, QUERY_PATTERN_RETRY, get_text_locale, get_cis_locale_dict
 import asyncio
 from concurrent.futures import Future
@@ -78,6 +78,41 @@ async def gen_audio_cmd(update: Update, context: CallbackContext) -> None:
 
 
 @user_restricted
+async def gen_audio_inline(update: Update, context: CallbackContext) -> None:
+    """reply to gen audio msg request"""
+    inline_toggle = context.user_data.get(TOGGLE_GEN_INLINE_KEY, None)
+    reply_id = update.message.message_id
+    if not inline_toggle:
+        reply = get_text_locale(update.effective_user, get_cis_locale_dict("Подсказка: если вы пытаетесь вызвать синтез, пожалуйста включите данный режим командой /toggle_inline"),
+                                "Hint: if you trying to start audio synthesis, please enable the inline mode via /toggle_inline")
+        await update.message.reply_html(reply, reply_to_message_id=reply_id)
+        return
+
+    text = update.message.text
+    if not validate_text(text):
+        reply = get_text_locale(update.effective_user, get_cis_locale_dict("Ошибка: обнаружен неприемлемый текст"), "Error: Invalid text detected")
+        await update.message.reply_text(reply, reply_to_message_id=reply_id)
+        return
+
+    context.application.create_task(start_gen_task(update, context, text), update=update)
+
+
+@user_restricted
+async def toggle_inline_cmd(update: Update, context: CallbackContext) -> None:
+    """reply to gen audio msg request"""
+    reply_id = update.message.message_id
+    inline_toggle = context.user_data.get(TOGGLE_GEN_INLINE_KEY, None)
+    if inline_toggle is None:
+        inline_toggle = context.user_data[TOGGLE_GEN_INLINE_KEY] = True
+    else:
+        inline_toggle = context.user_data[TOGGLE_GEN_INLINE_KEY] = not inline_toggle
+
+    reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"Режим синтеза через текстовые сообщения {'Включен' if inline_toggle else 'Выключен'}"),
+                            f"Inline audio generation mode is {'On' if inline_toggle else 'Off'}")
+    await update.message.reply_text(reply, reply_to_message_id=reply_id)
+
+
+@user_restricted
 async def retry_button(update: Update, context: CallbackContext) -> None:
     """launches tts task on a already completed one from the message keyboard"""
     query = update.callback_query
@@ -97,13 +132,15 @@ async def help_cmd(update: Update, context: CallbackContext) -> None:
                 "<u>/add_voice</u> - to start a guided process of adding user voice for cloning, by providing the name and audio samples "
                 "via files or voice recording(though voice quality will likely be subpar with bad mic recording)\n\n"
                 "<u>/settings</u> - change user specific settings for voice synthesis\n\n"
+                "<u>/toggle_inline</u> - toggle audio generation straight from text message\n\n"
                 f"Take a look at source code for additional info at <a href='{SOURCE_WEB_LINK}'>GitHub</a>")
-    help_msg_ru = ("Использование бота: выбирайте комманды из меню или вводите вручную. Доступный список комманд:\n\n"
-                   "<u>/gen</u> - сопроводите вызов данной комманды текстом через пробел, по её завершению будет выслан аудио файл,"
+    help_msg_ru = ("Использование бота: выбирайте команды из меню или вводите вручную. Доступный список команд:\n\n"
+                   "<u>/gen</u> - сопроводите вызов данной команды текстом через пробел, по её завершению будет выслан аудио файл,"
                    " что может занять некоторое время, в зависимости от длины текста (от нескольких секунд до нескольких минут)\n\n"
                    "<u>/add_voice</u> - начинает пошаговый процесс добавления нового голоса для клонирования, после указания имени и аудиоданных "
                    "в виде файлов или голосовой записи (однако качество голоса при последнем варианте может пострадать)\n\n"
                    "<u>/settings</u> - открыть меню настроек аудио-синтеза\n\n"
+                   "<u>/toggle_inline</u> - переключить режим синтеза аудио простой отправкой текстого сообщения\n\n"
                    f"Для дополнительной информации обратите внимание на страницу проекта на <a href='{SOURCE_WEB_LINK}'>GitHub</a>")
     reply = get_text_locale(user, get_cis_locale_dict(help_msg_ru), help_msg)
     await update.message.reply_html(reply)
