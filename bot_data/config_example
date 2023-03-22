@@ -1,8 +1,9 @@
 [Main]
 # Token string for telegram api
 TOKEN = YOUR_BOT_TOKEN
-# 64-bit int id for specific user private usage, comment out the line to make the bot public
-USER_ID = YOUR_ID
+# 64-bit int id or list of ids for specified user/users private usage, comment out the line to make the bot public
+USER_ID = YOUR_ID_LIST
+# for multiple users use following format: USER_ID = some_id_numer1, some_id_number2
 
 [Tortoise]
 # Keep cuda cache between generation request or not

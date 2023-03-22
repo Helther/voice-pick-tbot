@@ -34,7 +34,7 @@ logger.setLevel(logging.DEBUG)
 class Config(object):
     def __init__(self) -> None:
         self.token = ""
-        self.user_id = 0
+        self.user_id_set: set = set()
         self.keep_cache = False
         self.high_vram = True
         self.batch_size = None
@@ -42,7 +42,7 @@ class Config(object):
         self.default_voices = []
 
     def is_user_specified(self) -> bool:
-        return self.user_id != 0
+        return len(self.user_id_set) != 0
 
     def load_config(self, filepath: str) -> None:
         config = configparser.ConfigParser()
@@ -50,7 +50,13 @@ class Config(object):
             config.read_file(config_file)
             config_section_name = "Main"
             self.token = config[config_section_name]["TOKEN"]
-            self.user_id = config.getint(config_section_name, "USER_ID", fallback=0)
+            user_id_str = config[config_section_name].get("USER_ID", None)
+            if user_id_str:
+                user_id_str = user_id_str.replace(" ", "")
+                user_ids = user_id_str.split(",")
+                for id in user_ids:
+                    self.user_id_set.add(int(id))  # if config invalid then terminate
+
             config_section_name = "Tortoise"
             self.keep_cache = config.getboolean(config_section_name, "KEEP_CACHE")
             self.high_vram = config.getboolean(config_section_name, "HIGH_VRAM")
@@ -124,7 +130,7 @@ def user_restricted(func: Callable):
     async def inner(update, *args, **kwargs):
         user = update.effective_user
         user_id = user.id
-        if user_id != config.user_id and config.is_user_specified():
+        if config.is_user_specified() and user_id not in config.user_id_set:
             logger.debug(f"Unauthorized call of {func.__name__} by user: {user.full_name}, with id: {user_id}")
             if update.effective_message:
                 reply = get_text_locale(user, get_cis_locale_dict(f"{user.mention_html()}, в доступе отказано, к сожалению это частный бот"),
