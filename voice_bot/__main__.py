@@ -5,7 +5,7 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
-from telegram import Bot
+from telegram import Bot, request
 import asyncio
 import os.path
 from os import makedirs
@@ -27,7 +27,8 @@ def initialize_bot_data() -> None:
 
 
 async def init_bot_settings() -> Bot:
-    bot = Bot(utils.config.token)
+    bot = Bot(utils.config.token, request=request.HTTPXRequest(http_version="1.1"),
+              get_updates_request=request.HTTPXRequest(http_version="1.1"))
     cmds = [("gen", "Synthesize audio from provided text"),
             ("add_voice", "Add your custom voice"),
             ("toggle_inline", "Toggle audio generation via text message"),
