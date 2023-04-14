@@ -8,7 +8,15 @@ from telegram.ext import (
     filters
 )
 from telegram.error import BadRequest
-from modules.bot_utils import user_restricted, logger, sanitize_filename, get_user_voice_dir, convert_to_wav, get_text_locale, get_cis_locale_dict
+from modules.bot_utils import (
+    user_restricted,
+    logger,
+    sanitize_filename,
+    get_user_voice_dir,
+    convert_to_wav,
+    get_text_locale,
+    get_cis_locale_dict
+)
 from modules.bot_db import db_handle
 from modules.bot_settings import MAX_USER_VOICES_COUNT
 from enum import Enum

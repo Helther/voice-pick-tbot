@@ -9,7 +9,17 @@ from telegram import Bot, request
 import asyncio
 import os.path
 from os import makedirs
-from modules.bot_handlers import start_cmd, gen_audio_cmd, help_cmd, gen_audio_inline, retry_button, error_handler, toggle_inline_cmd, QUERY_PATTERN_RETRY, tts_work_thread
+from modules.bot_handlers import (
+    start_cmd,
+    gen_audio_cmd,
+    help_cmd,
+    gen_audio_inline,
+    retry_button,
+    error_handler,
+    toggle_inline_cmd,
+    QUERY_PATTERN_RETRY,
+    tts_work_thread
+)
 from modules.bot_settings_menu import get_settings_menu_handler
 from modules.bot_voice_addition_menu import get_add_voice_menu_handler
 import modules.bot_utils as utils
@@ -26,9 +36,13 @@ def initialize_bot_data() -> None:
     utils.config.load_config(os.path.join(utils.DATA_PATH, utils.CONFIG_FILE_NAME))
 
 
+def init_http_request() -> request.HTTPXRequest:
+    return request.HTTPXRequest(http_version="1.1", connection_pool_size=8, read_timeout=30, write_timeout=30)
+
+
 async def init_bot_settings() -> Bot:
-    bot = Bot(utils.config.token, request=request.HTTPXRequest(http_version="1.1"),
-              get_updates_request=request.HTTPXRequest(http_version="1.1"))
+    bot = Bot(utils.config.token, request=init_http_request(),
+              get_updates_request=init_http_request())
     cmds = [("gen", "Synthesize audio from provided text"),
             ("add_voice", "Add your custom voice"),
             ("toggle_inline", "Toggle audio generation via text message"),

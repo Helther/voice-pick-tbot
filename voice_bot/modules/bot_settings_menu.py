@@ -5,7 +5,15 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
-from modules.bot_utils import user_restricted, answer_query, get_text_locale, get_cis_locale_dict, config, logger, QUERY_PATTERN_RETRY
+from modules.bot_utils import (
+    user_restricted,
+    answer_query,
+    get_text_locale,
+    get_cis_locale_dict,
+    config,
+    logger,
+    QUERY_PATTERN_RETRY
+)
 from modules.bot_handlers import retry_button
 from modules.bot_settings import EMOTION_STRINGS, get_emotion_name
 from enum import Enum

@@ -3,10 +3,12 @@ from telegram import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     User,
-    Message
+    Message,
+    Bot
 )
 from telegram.error import TelegramError
 from telegram.ext import CallbackContext, Application, ContextTypes
+from telegram.constants import ChatAction, ParseMode
 import time
 import os
 from modules.bot_utils import (
@@ -71,12 +73,14 @@ async def gen_audio_cmd(update: Update, context: CallbackContext) -> None:
         return
 
     text = ' '.join(context.args)
-    if not validate_text(text):
-        reply = get_text_locale(user, get_cis_locale_dict("Ошибка: обнаружен неприемлемый текст"), "Error: Invalid text detected")
+    val_res, val_err_msg = validate_text(user, text)
+    if not val_res:
+        reply = get_text_locale(user, get_cis_locale_dict(f"Ошибка: обнаружен неприемлемый символ в тексте. {val_err_msg}"), f"Error: Invalid text detected. {val_err_msg}")
         await update.message.reply_text(reply, reply_to_message_id=reply_id)
         return
 
-    context.application.create_task(start_gen_task(update, context, text), update=update)
+    prog_msg: Message = await create_progress_msg(update, context)
+    context.application.create_task(start_gen_task(update, context, text, prog_msg), update=update)
 
 
 @user_restricted
@@ -93,12 +97,14 @@ async def gen_audio_inline(update: Update, context: CallbackContext) -> None:
         return
 
     text = update.message.text
-    if not validate_text(text):
-        reply = get_text_locale(user, get_cis_locale_dict("Ошибка: обнаружен неприемлемый текст"), "Error: Invalid text detected")
+    val_res, val_err_msg = validate_text(user, text)
+    if not val_res:
+        reply = get_text_locale(user, get_cis_locale_dict(f"Ошибка: обнаружен неприемлемый символ в тексте. {val_err_msg}"), f"Error: Invalid text detected. {val_err_msg}")
         await update.message.reply_text(reply, reply_to_message_id=reply_id)
         return
 
-    context.application.create_task(start_gen_task(update, context, text), update=update)
+    prog_msg: Message = await create_progress_msg(update, context)
+    context.application.create_task(start_gen_task(update, context, text, prog_msg), update=update)
 
 
 @user_restricted
@@ -124,8 +130,9 @@ async def retry_button(update: Update, context: CallbackContext) -> None:
     db_handle.init_user(user.id)
     context.application.create_task(answer_query(query), update=update)
 
+    prog_msg: Message = await create_progress_msg(update, context)
     # TODO get actual message text instead of caption
-    context.application.create_task(start_gen_task(update, context, query.message.caption), update=update)
+    context.application.create_task(start_gen_task(update, context, query.message.caption, prog_msg), update=update)
 
 
 async def help_cmd(update: Update, context: CallbackContext) -> None:
@@ -149,7 +156,7 @@ async def help_cmd(update: Update, context: CallbackContext) -> None:
                    "<u>/toggle_inline</u> - переключить режим синтеза аудио простой отправкой текстого сообщения\n\n"
                    f"Для дополнительной информации обратите внимание на страницу проекта на <a href='{SOURCE_WEB_LINK}'>GitHub</a>")
     reply = get_text_locale(user, get_cis_locale_dict(help_msg_ru), help_msg)
-    await update.message.reply_html(reply)
+    await update.message.reply_html(reply, disable_web_page_preview=True)
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -157,55 +164,61 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     if update and update.effective_message and update.effective_user:
         reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"{update.effective_user.mention_html()}, к сожалению произошла внутренняя ошибка сервера во время обработки команды, пожалуйста попробуйте еще раз"),
                                 f"Sorry {update.effective_user.mention_html()}, there has been a Server Internal Error when processing your command, please try again")
-        await update.effective_message.reply_html(reply, reply_to_message_id=update.effective_message.message_id)
+        try:
+            await update.effective_message.reply_html(reply, reply_to_message_id=update.effective_message.message_id)
+        except TelegramError:  # if reply message was deleted
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=reply, parse_mode=ParseMode.HTML)
 
 
 """ ------------------------------TTS related callbacks------------------------------ """
 
 
-async def start_gen_task(update: Update, context: CallbackContext, text: str) -> None:
+async def start_gen_task(update: Update, context: CallbackContext, text: str, progress_msg: Message) -> None:
     user = update.effective_user
     filename_result = os.path.abspath(os.path.join(RESULTS_PATH, '{}_{}.wav'.format(user.id, int(time.time()))))
     settings = get_user_settings(user.id)
     loop = asyncio.get_running_loop()
-    future = asyncio.run_coroutine_threadsafe(run_gen_audio(update, context.application, filename_result, settings, text, get_user_voice_dir(user.id), loop), tts_work_thread.loop)
+    future = asyncio.run_coroutine_threadsafe(run_gen_audio(update, context.application, progress_msg, filename_result, settings, text, get_user_voice_dir(user.id), loop), tts_work_thread.loop)
     future.add_done_callback(eval_gen_task)
 
 
-async def run_gen_audio(update: Update, app: Application, filename_result: str, settings: UserSettings, text: str, user_voices_dir: str, app_loop: AbstractEventLoop) -> None:
+async def run_gen_audio(update: Update, app: Application, progerss_msg: Message, filename_result: str, settings: UserSettings, text: str, user_voices_dir: str, app_loop: AbstractEventLoop) -> None:
     """Running in tts_worker thread"""
     try:
         tts_audio_from_text(filename_result, text, settings.voice, user_voices_dir, settings.emotion, settings.samples_num)
     except Exception as e:
-        async def handle_post_eval_gen_report_error(update: Update, app: Application, exc: Exception) -> None:
-            app.create_task(post_eval_gen_report_error(update, exc), update=update)
+        async def handle_post_eval_gen_report_error(update: Update, app: Application, progress_msg: Message, exc: Exception) -> None:
+            app.create_task(post_eval_gen_report_error(update, progress_msg, exc), update=update)
 
-        asyncio.run_coroutine_threadsafe(handle_post_eval_gen_report_error(update, app, e), app_loop)
+        asyncio.run_coroutine_threadsafe(handle_post_eval_gen_report_error(update, app, progerss_msg, e), app_loop)
 
-    return update, app, filename_result, text, settings.samples_num
+    return update, app, progerss_msg, filename_result, text, settings.samples_num
 
 
 def eval_gen_task(future: Future) -> None:
     try:
-        update, app, filename_result, text, samples_num = future.result()
+        update, app, progress_msg, filename_result, text, samples_num = future.result()
     except Exception as e:
         logger.error(msg="Exception while handling eval_gen_task:", exc_info=e)
     else:
-        app.create_task(post_eval_gen_task(update.effective_user, filename_result, text, samples_num, update.effective_message), update=update)
+        app.create_task(post_eval_gen_task(update, app, filename_result, text, samples_num, update.effective_message, progress_msg), update=update)
 
 
-async def post_eval_gen_report_error(update: Update, exc) -> None:
-    """handles errors from tts_worker thread"""
+async def post_eval_gen_report_error(update: Update, progress_msg: Message, exc) -> None:
+    """handles errors from tts_worker thread in a main thread"""
     clear_dir(RESULTS_PATH)
     logger.error(msg="Exception while handling run_gen_audio:", exc_info=exc)
+    await delete_progress_msg(progress_msg)
     if update and update.effective_message and update.effective_user:
         reply = get_text_locale(update.effective_user, get_cis_locale_dict(f"{update.effective_user.mention_html()}, к сожалению синтез аудио завершился ошибкой, пожалуйста попробуйте еще раз"),
                                 f"Sorry {update.effective_user.mention_html()}, your audio generation failed, please try again")
         await update.effective_message.reply_html(reply, reply_to_message_id=update.effective_message.message_id)
 
 
-async def post_eval_gen_task(user: User, filename_result: str, text: str, samples_num: int, message: Message) -> None:
+async def post_eval_gen_task(update: Update, app: Application, filename_result: str, text: str, samples_num: int, message: Message, progress_msg: Message) -> None:
+
     try:
+        user: User = update.effective_user
         for sample_ind in range(samples_num):
             sample_file = filename_result.replace(".wav", f"_{sample_ind}.wav")
             voice_file = convert_to_voice(sample_file)
@@ -218,7 +231,26 @@ async def post_eval_gen_task(user: User, filename_result: str, text: str, sample
 
             logger.info(f"Audio generation DONE: called by {user.full_name}, for sample №{sample_ind}, with query: {text}")
     except Exception as e:
+        app.create_task(delete_progress_msg(progress_msg), update=update)
         clear_dir(RESULTS_PATH)
         raise TelegramError("Audio generation Error") from e
     else:
+        app.create_task(delete_progress_msg(progress_msg), update=update)
         clear_dir(RESULTS_PATH)
+
+
+async def create_progress_msg(update: Update, context: CallbackContext):
+    """send chat action and a progress message and return the Message"""
+    bot: Bot = context.bot
+    chat_id: int = update.effective_chat.id
+    wait_emoji_ucode: str = "\U000023F3"
+    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.RECORD_VOICE)
+    return await bot.send_message(chat_id=chat_id, text=get_text_locale(update.effective_user, get_cis_locale_dict(f"{wait_emoji_ucode}Синтез в процессе...{wait_emoji_ucode}"),
+                                  f"{wait_emoji_ucode}Synthesis is in progress...{wait_emoji_ucode}"))
+
+
+async def delete_progress_msg(msg: Message) -> None:
+    try:
+        await msg.delete()
+    except TelegramError:
+        logger.error(msg="Failed to delete progress message")

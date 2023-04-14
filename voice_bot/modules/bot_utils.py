@@ -72,9 +72,21 @@ class Config(object):
 config = Config()
 
 
-def validate_text(text: str) -> bool:
-    # TODO
-    return text
+def validate_text(user, text: str) -> tuple:
+    """
+    check if there is a text and look for invalid emotion brakets in text
+    returns validation result and failure reason
+    """
+    is_text_there = len(text) > 0
+    empty_text_err_msg = get_text_locale(user, get_cis_locale_dict("В сообщении нет текста"), "There is no text")
+    if '[' not in text:
+        return is_text_there, empty_text_err_msg
+    splitted = text.split('[')
+    for spl in splitted[1:]:
+        if ']' not in spl:
+            return False, get_text_locale(user, get_cis_locale_dict("Обнаружена незакрытая скобка ']'"), "Detected unpaired bracket symbol ']'")
+
+    return is_text_there, empty_text_err_msg
 
 
 def log_cmd(user, name: str) -> None:

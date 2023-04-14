@@ -37,7 +37,6 @@ You can also try to add different emotions to sentences by prepending parts of t
 notations (For more info please visit [the original model source page](https://github.com/neonbjb/tortoise-tts)).
 
 ### TODO
- * add progress mesg for current job, send_action(ChatAction.RECORD_VOICE)
  * add voice to voice conversion, start from keyboard, use conversation and https://github.com/openai/whisper
 
 ## License
