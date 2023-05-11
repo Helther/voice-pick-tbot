@@ -19,6 +19,7 @@ from modules.bot_utils import (
     log_cmd,
     get_user_voice_dir,
     answer_query,
+    remove_temp_file,
     logger,
     MAX_CHARS_NUM,
     RESULTS_PATH
@@ -27,10 +28,14 @@ from modules.tortoise_api import tts_audio_from_text
 from modules.bot_db import db_handle
 from modules.bot_settings import get_user_settings, UserSettings, TOGGLE_GEN_INLINE_KEY
 from modules.bot_utils import SOURCE_WEB_LINK, QUERY_PATTERN_RETRY, get_text_locale, get_cis_locale_dict
+from modules.whisper_api import transcribe_voice, WHISPER_SAMPLE_RATE
 import asyncio
 from concurrent.futures import Future
 from threading import Thread
 from asyncio.events import AbstractEventLoop
+from librosa import load
+from typing import Union
+from numpy import ndarray
 
 
 class TTSWorkThread(Thread):
@@ -159,6 +164,32 @@ async def help_cmd(update: Update, context: CallbackContext) -> None:
     await update.message.reply_html(reply, disable_web_page_preview=True)
 
 
+async def gen_audio_from_voice(update: Update, context: CallbackContext) -> None:
+    """reply to voice msg"""
+    user = update.effective_user
+    db_handle.init_user(user.id)
+
+    if update.message.voice:  # validate voice file
+        filetype = "ogg"
+        file_path = os.path.abspath(os.path.join(RESULTS_PATH, f'{user.id}_{int(time.time())}.{filetype}'))
+        try:
+            with open(file_path, mode='w'):
+                pass
+            file = await context.bot.get_file(update.message.voice)
+            await file.download_to_drive(file_path)
+            audio, _ = load(file_path, sr=WHISPER_SAMPLE_RATE)
+        except Exception as e:
+            remove_temp_file(file_path)
+            raise TelegramError("Audio from voice Error: download failure") from e
+        finally:
+            remove_temp_file(file_path)
+    else:
+        raise TelegramError("Audio from voice Error: no voice")
+
+    prog_msg: Message = await create_progress_msg(update, context)
+    context.application.create_task(start_gen_task(update, context, audio, prog_msg), update=update)
+
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
     if update and update.effective_message and update.effective_user:
@@ -173,26 +204,33 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 """ ------------------------------TTS related callbacks------------------------------ """
 
 
-async def start_gen_task(update: Update, context: CallbackContext, text: str, progress_msg: Message) -> None:
+async def start_gen_task(update: Update, context: CallbackContext, data: Union[str, ndarray], progress_msg: Message) -> None:
+    """data - represents text, in case of text message handle and audio data, in case of voice mesage handle"""
     user = update.effective_user
     filename_result = os.path.abspath(os.path.join(RESULTS_PATH, '{}_{}.wav'.format(user.id, int(time.time()))))
     settings = get_user_settings(user.id)
     loop = asyncio.get_running_loop()
-    future = asyncio.run_coroutine_threadsafe(run_gen_audio(update, context.application, progress_msg, filename_result, settings, text, get_user_voice_dir(user.id), loop), tts_work_thread.loop)
+    future = asyncio.run_coroutine_threadsafe(run_gen_audio(update, context.application, progress_msg, filename_result, settings, data, get_user_voice_dir(user.id), loop), tts_work_thread.loop)
     future.add_done_callback(eval_gen_task)
 
 
-async def run_gen_audio(update: Update, app: Application, progerss_msg: Message, filename_result: str, settings: UserSettings, text: str, user_voices_dir: str, app_loop: AbstractEventLoop) -> None:
-    """Running in tts_worker thread"""
+async def run_gen_audio(update: Update, app: Application, progerss_msg: Message, filename_result: str, settings: UserSettings, data: Union[str, ndarray], user_voices_dir: str, app_loop: AbstractEventLoop) -> None:
+    """Running on tts_worker thread"""
     try:
-        tts_audio_from_text(filename_result, text, settings.voice, user_voices_dir, settings.emotion, settings.samples_num)
+        if isinstance(data, ndarray):  # transcibe voice data
+            data = transcribe_voice(data)
+            val_res, val_err_msg = validate_text(update.effective_user, data)
+            if not val_res:
+                raise Exception(f"text validation error: {val_err_msg}")
+
+        tts_audio_from_text(filename_result, data, settings.voice, user_voices_dir, settings.emotion, settings.samples_num)
     except Exception as e:
         async def handle_post_eval_gen_report_error(update: Update, app: Application, progress_msg: Message, exc: Exception) -> None:
             app.create_task(post_eval_gen_report_error(update, progress_msg, exc), update=update)
 
         asyncio.run_coroutine_threadsafe(handle_post_eval_gen_report_error(update, app, progerss_msg, e), app_loop)
 
-    return update, app, progerss_msg, filename_result, text, settings.samples_num
+    return update, app, progerss_msg, filename_result, data, settings.samples_num
 
 
 def eval_gen_task(future: Future) -> None:

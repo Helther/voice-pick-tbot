@@ -14,6 +14,7 @@ from modules.bot_handlers import (
     gen_audio_cmd,
     help_cmd,
     gen_audio_inline,
+    gen_audio_from_voice,
     retry_button,
     error_handler,
     toggle_inline_cmd,
@@ -26,12 +27,9 @@ import modules.bot_utils as utils
 
 
 def initialize_bot_data() -> None:
-    if not os.path.exists(utils.RESULTS_PATH):
-        makedirs(utils.RESULTS_PATH)
-    if not os.path.exists(utils.MODELS_PATH):
-        makedirs(utils.MODELS_PATH)
-    if not os.path.exists(utils.VOICES_PATH):
-        makedirs(utils.VOICES_PATH)
+    makedirs(utils.RESULTS_PATH, exist_ok=True)
+    makedirs(utils.MODELS_PATH, exist_ok=True)
+    makedirs(utils.VOICES_PATH, exist_ok=True)
 
     utils.config.load_config(os.path.join(utils.DATA_PATH, utils.CONFIG_FILE_NAME))
 
@@ -73,6 +71,7 @@ def run_application() -> None:
     application.add_handler(get_add_voice_menu_handler())
     application.add_handler(CallbackQueryHandler(retry_button, pattern=f"^{QUERY_PATTERN_RETRY}*"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, gen_audio_inline))
+    application.add_handler(MessageHandler(filters.VOICE & ~filters.COMMAND, gen_audio_from_voice))
 
     application.add_error_handler(error_handler)
 

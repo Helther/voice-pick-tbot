@@ -100,10 +100,7 @@ def convert_to_voice(filename: str) -> str:
         subprocess.run(f"{convert_to_voice_cmd}", shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         traceback.print_exc(file=sys.stdout)
-        try:
-            os.remove(result_file)  # may not produce the result
-        except Exception:
-            pass
+        remove_temp_file(result_file)  # may not produce the result
         result_file = None
 
     return result_file
@@ -115,16 +112,10 @@ def convert_to_wav(filename: str) -> str:
     try:
         subprocess.run(f"{convert_to_voice_cmd}", shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
-        try:
-            os.remove(result_file)
-        except Exception:
-            pass
+        remove_temp_file(result_file)
         raise Exception from e
     finally:
-        try:
-            os.remove(filename)
-        except Exception:
-            pass
+        remove_temp_file(filename)
 
     return result_file
 
@@ -199,3 +190,11 @@ def get_text_locale(user, locales: dict, default: str) -> str:
 def get_cis_locale_dict(text: str) -> dict:
     # returns locales dict for CIS countries that may use ru lang
     return {"ab": text, "be": text, "kk": text, "ky": text, "ru": text}
+
+
+def remove_temp_file(file_path: str) -> None:
+    """if maybe doesn't exist"""
+    try:
+        os.remove(file_path)
+    except Exception:
+        pass
