@@ -1,0 +1,7 @@
+[submodule "tortoise"]
+	path = tortoise-tts-fast
+	url = https://github.com/152334H/tortoise-tts-fast.git
+
+[submodule "whisper"]
+	path = faster-whisper
+	url = https://github.com/guillaumekln/faster-whisper.git
