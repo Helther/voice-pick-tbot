@@ -20,10 +20,17 @@ Here's the preview:
  
 Tested on Linux only, written with cross-platform in mind, should work on Windows. Although tortoise-tts environment may fail to resolve.
 ### install
-cd to repo directory and execute:
+Clone the repo with submodules
 ```
-git clone https://github.com/152334H/tortoise-tts-fast.git
-git clone https://github.com/guillaumekln/faster-whisper.git
+git clone --recurse-submodules $(URL)
+```
+For example, let's create new conda  environment and install bot there
+```
+conda create -n voice_tbot python=3.10.6
+conda activate voice_tbot
+```
+cd to repo directory and execute to install dependencies:
+```
 python -m pip install -r ./requirements.txt
 ```
 
