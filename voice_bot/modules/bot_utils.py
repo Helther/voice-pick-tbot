@@ -9,18 +9,19 @@ from functools import wraps
 from typing import Callable
 from tortoise.utils import audio
 import string
+from os import makedirs
 
 
 MAX_CHARS_NUM = 300
 CONFIG_FILE_NAME = "config"
-SCRIPT_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../")
-DATA_PATH = os.path.join(SCRIPT_PATH, "../bot_data")
+SCRIPT_PATH = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../"))
+DATA_PATH = os.path.realpath(os.path.join(SCRIPT_PATH, "../bot_data"))
 RESULTS_PATH = os.path.join(DATA_PATH, "outputs")
 MODELS_PATH = os.path.join(DATA_PATH, "models")
 VOICES_PATH = os.path.join(DATA_PATH, "user_voices")
 QUERY_PATTERN_RETRY = "c_re"
 SOURCE_WEB_LINK = "https://github.com/Helther/voice-pick-tbot"
-FOLDER_CHAR_LIMIT = os.statvfs(VOICES_PATH).f_namemax
+FOLDER_CHAR_LIMIT = 0
 
 
 # Enable logging
@@ -40,6 +41,9 @@ class Config(object):
         self.batch_size = None
         self.device = 0
         self.default_voices = []
+        makedirs(RESULTS_PATH, exist_ok=True)
+        makedirs(MODELS_PATH, exist_ok=True)
+        makedirs(VOICES_PATH, exist_ok=True)
 
     def is_user_specified(self) -> bool:
         return len(self.user_id_set) != 0

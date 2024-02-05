@@ -1,5 +1,5 @@
 from faster_whisper import WhisperModel, download_model
-from modules.bot_utils import logger, MODELS_PATH
+from voice_bot.modules.bot_utils import logger, MODELS_PATH
 import os
 
 # use base size multilang model for ideal performance/quality

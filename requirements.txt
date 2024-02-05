@@ -1,3 +1,4 @@
 python-telegram-bot==20.1
 ./tortoise-tts-fast
 ./faster-whisper
+transformers==4.29.2

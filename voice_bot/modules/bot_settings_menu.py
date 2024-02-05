@@ -5,7 +5,7 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
-from modules.bot_utils import (
+from voice_bot.modules.bot_utils import (
     user_restricted,
     answer_query,
     get_text_locale,
@@ -14,10 +14,10 @@ from modules.bot_utils import (
     logger,
     QUERY_PATTERN_RETRY
 )
-from modules.bot_handlers import retry_button
-from modules.bot_settings import EMOTION_STRINGS, get_emotion_name
+from voice_bot.modules.bot_handlers import retry_button
+from voice_bot.modules.bot_settings import EMOTION_STRINGS, get_emotion_name
 from enum import Enum
-from modules.bot_db import db_handle
+from voice_bot.modules.bot_db import db_handle
 import json
 from itertools import zip_longest
 import shutil

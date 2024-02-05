@@ -8,7 +8,7 @@ from telegram.ext import (
     filters
 )
 from telegram.error import BadRequest
-from modules.bot_utils import (
+from voice_bot.modules.bot_utils import (
     user_restricted,
     logger,
     sanitize_filename,
@@ -17,13 +17,13 @@ from modules.bot_utils import (
     get_text_locale,
     get_cis_locale_dict
 )
-from modules.bot_db import db_handle
-from modules.bot_settings import MAX_USER_VOICES_COUNT
+from voice_bot.modules.bot_db import db_handle
+from voice_bot.modules.bot_settings import MAX_USER_VOICES_COUNT
 from enum import Enum
 import os
 import shutil
 from tortoise.utils.audio import read_audio_file
-from modules.bot_settings_menu import report_error
+from voice_bot.modules.bot_settings_menu import report_error
 from librosa import get_duration, load
 
 

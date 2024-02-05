@@ -5,11 +5,11 @@ from torch.cuda import empty_cache
 from torch import cat
 from typing import List, Tuple
 from tortoise.utils.text import split_and_recombine_text
-from modules.bot_utils import MODELS_PATH, config, get_emot_string
+from voice_bot.modules.bot_utils import MODELS_PATH, config, get_emot_string
 
 
 # init tts models
-tts = tortoise.api.TextToSpeech(models_dir=MODELS_PATH, high_vram=config.high_vram, autoregressive_batch_size=config.batch_size, device=config.device)
+tts = tortoise.api.TextToSpeech(high_vram=config.high_vram, autoregressive_batch_size=config.batch_size, device=config.device)
 
 
 def run_tts_on_text(filename: str, text: str, voice: str, user_voices_dir: str, candidates: int) -> List[Tuple]:

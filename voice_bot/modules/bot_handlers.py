@@ -11,7 +11,7 @@ from telegram.ext import CallbackContext, Application, ContextTypes
 from telegram.constants import ChatAction, ParseMode
 import time
 import os
-from modules.bot_utils import (
+from voice_bot.modules.bot_utils import (
     validate_text,
     convert_to_voice,
     clear_dir,
@@ -24,11 +24,11 @@ from modules.bot_utils import (
     MAX_CHARS_NUM,
     RESULTS_PATH
 )
-from modules.tortoise_api import tts_audio_from_text
-from modules.bot_db import db_handle
-from modules.bot_settings import get_user_settings, UserSettings, TOGGLE_GEN_INLINE_KEY
-from modules.bot_utils import SOURCE_WEB_LINK, QUERY_PATTERN_RETRY, get_text_locale, get_cis_locale_dict
-from modules.whisper_api import transcribe_voice, WHISPER_SAMPLE_RATE
+from voice_bot.modules.tortoise_api import tts_audio_from_text
+from voice_bot.modules.bot_db import db_handle
+from voice_bot.modules.bot_settings import get_user_settings, UserSettings, TOGGLE_GEN_INLINE_KEY
+from voice_bot.modules.bot_utils import SOURCE_WEB_LINK, QUERY_PATTERN_RETRY, get_text_locale, get_cis_locale_dict
+from voice_bot.modules.whisper_api import transcribe_voice, WHISPER_SAMPLE_RATE
 import asyncio
 from concurrent.futures import Future
 from threading import Thread

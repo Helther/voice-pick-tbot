@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from typing import List
-from modules.bot_utils import DATA_PATH, VOICES_PATH
+from voice_bot.modules.bot_utils import DATA_PATH, VOICES_PATH
 import shutil
 
 

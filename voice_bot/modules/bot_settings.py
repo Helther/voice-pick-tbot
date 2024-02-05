@@ -1,5 +1,5 @@
 from enum import Enum
-from modules.bot_db import db_handle
+from voice_bot.modules.bot_db import db_handle
 
 
 MAX_USER_VOICES_COUNT = 20

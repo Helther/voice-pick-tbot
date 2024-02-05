@@ -8,8 +8,7 @@ from telegram.ext import (
 from telegram import Bot, request
 import asyncio
 import os.path
-from os import makedirs
-from modules.bot_handlers import (
+from voice_bot.modules.bot_handlers import (
     start_cmd,
     gen_audio_cmd,
     help_cmd,
@@ -21,17 +20,14 @@ from modules.bot_handlers import (
     QUERY_PATTERN_RETRY,
     tts_work_thread
 )
-from modules.bot_settings_menu import get_settings_menu_handler
-from modules.bot_voice_addition_menu import get_add_voice_menu_handler
-import modules.bot_utils as utils
+from voice_bot.modules.bot_settings_menu import get_settings_menu_handler
+from voice_bot.modules.bot_voice_addition_menu import get_add_voice_menu_handler
+import voice_bot.modules.bot_utils as utils
 
 
 def initialize_bot_data() -> None:
-    makedirs(utils.RESULTS_PATH, exist_ok=True)
-    makedirs(utils.MODELS_PATH, exist_ok=True)
-    makedirs(utils.VOICES_PATH, exist_ok=True)
-
     utils.config.load_config(os.path.join(utils.DATA_PATH, utils.CONFIG_FILE_NAME))
+    utils.FOLDER_CHAR_LIMIT = os.statvfs(utils.VOICES_PATH).f_namemax
 
 
 def init_http_request() -> request.HTTPXRequest:

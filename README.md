@@ -28,10 +28,13 @@ python -m pip install -r ./requirements.txt
 ```
 
 ### Usage
-Create configuration file named "config" inside bota_data directory
+Create configuration file named "config" inside bot_data directory
 and set user parameters. Use this [example](bot_data/config_example) as reference.
 
-Run module package voice_bot from the required environment
+Run module package voice_bot from the required environment, for example - from repo directory:
+```
+python -m voice_bot
+```
 
 ### Notes on text promts (how to get desired results)
 Use punctuation (ellipses, exclamation points, CAPS, semicolons, commas) to add emphasis and shape the speech.
@@ -39,7 +42,6 @@ You can also try to add different emotions to sentences by prepending parts of t
 notations (For more info please visit [the original model source page](https://github.com/neonbjb/tortoise-tts)).
 
 ### TODO
- * restructure external git dependencies
  * add synthensis from audio files
 
 ## License
